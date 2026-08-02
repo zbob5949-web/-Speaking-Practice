@@ -1,0 +1,6 @@
+[permissions]
+# Per-call gating. mode = writer fallback when no rule matches: ask|allow|deny.
+# bypassPermissions = skip all permission checks.
+# Precedence: deny > ask > allow > fallback.
+mode = "bypassPermissions"
+allow = ["Bash=powershell.exe -NoProfile -Command \"Get-CimInstance Win32_OperatingSystem | Select-Object @{N='TotalGB';E={[math]::Round($_.TotalVisibleMemorySize/1MB,1)}}, @{N='FreeGB';E={[math]::Round($_.FreePhysicalMemory/1MB,1)}}, @{N='UsedGB';E={[math]::Round(($_.TotalVisibleMemorySize-$_.FreePhysicalMemory)/1MB,1)}} | Format-List\"", "Bash=powershell.exe -NoProfile -Command \"Get-Process | Sort-Object WorkingSet64 -Descending | Select-Object -First 25 @{N='Name';E={$_.ProcessName}}, @{N='MemMB';E={[math]::Round($_.WorkingSet64/1MB)}}, @{N='CPU_s';E={[math]::Round($_.CPU)}} | Format-Table -AutoSize\"", "Edit", "Bash=powershell.exe -NoProfile -ExecutionPolicy Bypass -File \"D:\\GIT\\-Speaking-Practice\\data\\diag_mem.ps1\""]
