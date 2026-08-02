@@ -1,0 +1,8 @@
+-e .
+langchain-core>=0.3.0
+edge-tts>=6.1.0
+PyJWT>=2.8.0
+bcrypt>=4.1.0
+sherpa-onnx>=1.13.0
+miniaudio>=1.60
+numpy>=1.26.0
