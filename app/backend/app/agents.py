@@ -185,6 +185,55 @@ def normalize_orchestration_payload(payload: dict[str, object]) -> dict[str, obj
 
 from typing import Iterator
 
+from app.scenarios import tier_for_level
+
+
+def _conversation_level_guidance(user_level: str) -> str:
+    """按用户水平生成对话难度与长度的显式指令，让小白/中级/大神的对话明显区分。
+
+    小白：简短高频词、一次一个问题、慢节奏；
+    中级：复合句、自然追问、中等长度；
+    大神：复杂句、习语、多轮追问，制造更长的深度对话。
+    """
+    tier = tier_for_level(user_level or "")
+    if tier == "advanced":
+        return (
+            "5. 台词长度与难度（大神级 C1）：每轮输出 3-4 句地道英文台词，使用复杂句、条件句、"
+            "习语与自然的口语表达；在回应后主动追问细节、提出假设或反例，模拟真实的高强度对话，"
+            "每轮总长 15 词以上。"
+        )
+    if tier == "intermediate":
+        return (
+            "5. 台词长度与难度（中级 B1/B2）：每轮输出 2-3 句英文台词，使用常见复合句和连接词，"
+            "在回应后自然追加一个细节问题，句长 8-15 词。"
+        )
+    return (
+        "5. 台词长度与难度（小白 A1/A2）：每轮输出 1-2 句简短英文台词，只使用高频简单词汇，"
+        "句长不超过 8 个词，一次只问一个问题，放慢节奏、多给用户开口时间。"
+    )
+
+
+def _conversation_offtopic_rule() -> str:
+    """追加在 system prompt 最末尾的通用规则：必须接住用户场景外/闲聊内容。
+
+    放在 level guidance 之后、所有规则的最后，优先级最高，
+    即使数据库里覆盖了对话模板也能生效。
+    """
+    return (
+        "\n9. 接住用户最新一句：用户最新一句话如果与当前场景无关或超出剧本"
+        "（例如饿了、累了、抱怨、问别的问题、突然聊别的话题），NPC 必须先自然回应该内容——"
+        "表达关心、接一句相关的话或回应对方的问题——然后再在合适时机引导回场景；"
+        "绝对不允许无视用户刚说的话，继续机械推进场景脚本。"
+    )
+
+
+def _last_user_line(conversation: list[dict[str, str]]) -> str:
+    """取对话历史中用户最新一句，让 NPC 明确知道要接住什么。"""
+    for turn in reversed(conversation):
+        if turn.get("speaker") == "user":
+            return turn.get("text", "")
+    return ""
+
 
 def format_roleplay_history(conversation: list[dict[str, str]]) -> str:
     lines = []
@@ -279,6 +328,7 @@ class ConversationAgent:
         
         system_template = self.get_prompt("conversation_agent_system")
         system_prompt = system_template.format(user_level=user_level, learning_goal=learning_goal)
+        system_prompt = f"{system_prompt}\n{_conversation_level_guidance(user_level)}\n{_conversation_offtopic_rule()}"
         
         user_template = self.get_prompt("conversation_agent_user_template")
         user_prompt = user_template.format(
@@ -286,6 +336,7 @@ class ConversationAgent:
             objective=objective,
             practice_brief_context=practice_brief_context,
             user_prompt_turns=user_prompt_turns,
+            last_user_line=_last_user_line(recent_turns),
         )
         if practice_brief_context and "{practice_brief_context}" not in user_template:
             user_prompt = (
@@ -386,6 +437,7 @@ class ConversationAgent:
         
         system_template = self.get_prompt("conversation_agent_system")
         system_prompt = system_template.format(user_level=user_level, learning_goal=learning_goal)
+        system_prompt = f"{system_prompt}\n{_conversation_level_guidance(user_level)}\n{_conversation_offtopic_rule()}"
         
         user_template = self.get_prompt("conversation_agent_user_template")
         user_prompt = user_template.format(
@@ -393,6 +445,7 @@ class ConversationAgent:
             objective=objective,
             practice_brief_context=practice_brief_context,
             user_prompt_turns=user_prompt_turns,
+            last_user_line=_last_user_line(recent_turns),
         )
         if practice_brief_context and "{practice_brief_context}" not in user_template:
             user_prompt = (

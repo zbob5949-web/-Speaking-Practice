@@ -7,6 +7,10 @@ type Props = {
   onText: (text: string) => void;
   /** 长按录音：松手后输出音频（由对话页隐式转文字并触发 AI 回复） */
   onVoiceMessage?: (blob: Blob, durationMs: number) => void;
+  /** 电话模式：为 true 时进入自动录音（静音自动停止），循环由父组件信号驱动 */
+  autoMode?: boolean;
+  /** 每次递增触发一次自动开始录音（父组件在 AI 说完后 +1） */
+  autoRecordSignal?: number;
 };
 
 const BAR_COUNT = 24;
@@ -19,7 +23,7 @@ type AudioContextWindow = Window & {
 
 type RecordMode = "hold" | "transcribe";
 
-export function VoiceRecorder({ disabled = false, onText, onVoiceMessage }: Props) {
+export function VoiceRecorder({ disabled = false, onText, onVoiceMessage, autoMode = false, autoRecordSignal = 0 }: Props) {
   const [mode, setMode] = useState<RecordMode>("hold");
   const [isRecording, setIsRecording] = useState(false);
   const [isCancelling, setIsCancelling] = useState(false);
@@ -39,6 +43,41 @@ export function VoiceRecorder({ disabled = false, onText, onVoiceMessage }: Prop
   const activeModeRef = useRef<RecordMode>("hold");
   const finishedRef = useRef(false);
   const startTimeRef = useRef(0);
+  // 电话模式：自动录音相关
+  const autoModeRef = useRef(false);
+  const hasSpokenRef = useRef(false);
+  const silenceStartRef = useRef<number | null>(null);
+  const onTextRef = useRef(onText);
+  const onVoiceMessageRef = useRef(onVoiceMessage);
+
+  useEffect(() => {
+    onTextRef.current = onText;
+  }, [onText]);
+  useEffect(() => {
+    onVoiceMessageRef.current = onVoiceMessage;
+  }, [onVoiceMessage]);
+
+  // 进入/退出电话模式：退出时取消进行中的录音
+  useEffect(() => {
+    autoModeRef.current = autoMode;
+    if (!autoMode) {
+      hasSpokenRef.current = false;
+      silenceStartRef.current = null;
+      if (recorderRef.current && recorderRef.current.state === "recording") {
+        stopRecording(true);
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoMode]);
+
+  // 父组件信号：AI 已说完，开始新一轮自动录音
+  useEffect(() => {
+    if (!autoMode || autoRecordSignal <= 0) return;
+    hasSpokenRef.current = false;
+    silenceStartRef.current = null;
+    void startRecording("transcribe");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoRecordSignal]);
 
   const stopWaveform = () => {
     if (animationFrameRef.current !== null) {
@@ -75,7 +114,22 @@ export function VoiceRecorder({ disabled = false, onText, onVoiceMessage }: Prop
       const normalized = (value - 128) / 128;
       energy += normalized * normalized;
     }
-    const amplitude = Math.min(1, Math.sqrt(energy / timeData.length) * 3.2);
+    let amplitude = Math.min(1, Math.sqrt(energy / timeData.length) * 3.2);
+    // 电话模式：检测到说过话后，连续静音 1.2 秒自动停止并转写
+    if (autoModeRef.current && recorderRef.current && recorderRef.current.state === "recording") {
+      if (amplitude > 0.05) {
+        hasSpokenRef.current = true;
+        silenceStartRef.current = null;
+      } else if (hasSpokenRef.current) {
+        if (silenceStartRef.current === null) {
+          silenceStartRef.current = performance.now();
+        } else if (performance.now() - silenceStartRef.current > 1200) {
+          silenceStartRef.current = null;
+          hasSpokenRef.current = false;
+          stopRecording(false);
+        }
+      }
+    }
     const bars = Array.from({ length: BAR_COUNT }, (_, index) => {
       const start = Math.floor((index / BAR_COUNT) * frequencyData.length);
       const end = Math.max(start + 1, Math.floor(((index + 1) / BAR_COUNT) * frequencyData.length));
@@ -100,7 +154,7 @@ export function VoiceRecorder({ disabled = false, onText, onVoiceMessage }: Prop
       if (!text) {
         setError("没有识别到清晰语音，请再试一次");
       } else {
-        onText(text);
+        onTextRef.current(text);
       }
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "语音识别失败，请再试一次");
@@ -124,9 +178,9 @@ export function VoiceRecorder({ disabled = false, onText, onVoiceMessage }: Prop
       setIsCancelling(false);
       startYRef.current = null;
       if (!cancelled && blob.size > 0) {
-        if (mode === "hold" && onVoiceMessage) {
+        if (mode === "hold" && onVoiceMessageRef.current) {
           // 语音条：直接把音频交给对话页，由对话页隐式转文字并触发 AI 回复
-          onVoiceMessage(blob, durationMs);
+          onVoiceMessageRef.current(blob, durationMs);
         } else {
           void finishRecording(blob, "speakmate-recording.webm");
         }
@@ -146,7 +200,13 @@ export function VoiceRecorder({ disabled = false, onText, onVoiceMessage }: Prop
     }
 
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true, // 浏览器自动增益：小声说话也会被放大，提升识别灵敏度
+        },
+      });
       streamRef.current = stream;
       chunksRef.current = [];
       finishedRef.current = false;

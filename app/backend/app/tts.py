@@ -19,13 +19,17 @@ async def _synthesize(text: str, voice: str, rate: str) -> bytes:
     return bytes(buffer)
 
 
-def synthesize_tts_audio(text: str) -> bytes:
-    """生成 MP3 音频字节。失败时抛出 RuntimeError（由路由层转 502）。"""
+def synthesize_tts_audio(text: str, voice: str | None = None) -> bytes:
+    """生成 MP3 音频字节。失败时抛出 RuntimeError（由路由层转 502）。
+
+    voice 为空时使用配置的默认音色（TTS_VOICE，未设置时默认 en-US-JennyNeural）。
+    """
     settings = load_settings()
+    selected = voice or settings.tts_voice
     try:
         return asyncio.run(
             asyncio.wait_for(
-                _synthesize(text, voice=settings.tts_voice, rate=settings.tts_rate),
+                _synthesize(text, voice=selected, rate=settings.tts_rate),
                 timeout=30,
             )
         )

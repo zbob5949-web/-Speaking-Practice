@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 
-export type AppView = "today" | "scenes" | "practice" | "growth" | "settings";
+export type AppView = "today" | "scenes" | "practice" | "growth" | "me" | "settings";
 
 type Props = {
   activeView: AppView;
@@ -13,7 +13,8 @@ const navItems: Array<{ view: AppView; label: string }> = [
   { view: "today", label: "今日" },
   { view: "scenes", label: "场景" },
   { view: "growth", label: "成长" },
-  { view: "settings", label: "我的" }
+  { view: "me", label: "我的" },
+  { view: "settings", label: "设置" }
 ];
 
 export function AppShell({ activeView, children, onNavigate, onLogout }: Props) {

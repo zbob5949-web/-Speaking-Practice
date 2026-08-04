@@ -12,11 +12,11 @@ data/*.sqlite-wal
 .env
 .superpowers/
 
- # 数据库（任何目录下）
- **/*.sqlite
- **/*.sqlite-shm
- **/*.sqlite-wal
- **/*.db
- 
-  # ASR 模型（用下载脚本重新获取，约450MB）
- data/asr_model/
+# 数据库（任何目录下）
+**/*.sqlite
+**/*.sqlite-shm
+**/*.sqlite-wal
+**/*.db
+
+# ASR 模型（用下载脚本重新获取，约450MB）
+data/asr_model/

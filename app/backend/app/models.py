@@ -31,6 +31,7 @@ class UserTurnRequest(BaseModel):
 
 class TTSRequest(BaseModel):
     text: str = Field(min_length=1)
+    voice: str | None = None
 
 class SwitchProfileRequest(BaseModel):
     profile_id: int

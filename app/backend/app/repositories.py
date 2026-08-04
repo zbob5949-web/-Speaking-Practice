@@ -144,7 +144,7 @@ class CoachRepository:
             row = connection.execute("SELECT * FROM daily_sessions WHERE id = ?", (session_id,)).fetchone()
             return row_to_dict(row) if row else None
 
-    def complete_session(self, session_id: int, summary: dict[str, Any], overall_score: int = 3) -> dict[str, Any] | None:
+    def complete_session(self, session_id: int, summary: dict[str, Any], overall_score: int = 3, mark_plan_completed: bool = True) -> dict[str, Any] | None:
         with connect(self.db_path) as connection:
             session = connection.execute("SELECT * FROM daily_sessions WHERE id = ?", (session_id,)).fetchone()
             if not session:
@@ -159,7 +159,7 @@ class CoachRepository:
                 """,
                 (json.dumps(summary, ensure_ascii=False), overall_score, session_id),
             )
-            if session["plan_day_id"]:
+            if session["plan_day_id"] and mark_plan_completed:
                 connection.execute(
                     "UPDATE learning_plan SET status = ? WHERE id = ?",
                     ("completed", session["plan_day_id"]),
@@ -226,6 +226,46 @@ class CoachRepository:
             )
             saved = connection.execute("SELECT * FROM daily_sessions WHERE id = ?", (cursor.lastrowid,)).fetchone()
             return row_to_dict(saved)
+
+    def delete_open_scenario_sessions(self, profile_id: int | None, keep_scenario_id: str | None = None) -> int:
+        """删除某画像下所有未结束的其他场景会话（连同回合与纠错记录）。
+
+        用于「选择新场景后自动清掉上次场景的对话」：切换到新场景时调用，
+        让每个场景始终以全新状态开始，避免再次进入时还残留上次对话。
+        未传 profile_id 时不做删除（避免误删全局会话）。
+        """
+        if profile_id is None:
+            return 0
+        with connect(self.db_path) as connection:
+            clauses = [
+                "plan_day_id IS NULL",
+                "scenario_id IS NOT NULL",
+                "scenario_id != ''",
+                "(ended_at IS NULL OR ended_at = '')",
+                "(profile_id = ? OR profile_id IS NULL)",
+            ]
+            params: list[Any] = [profile_id]
+            if keep_scenario_id is not None:
+                clauses.append("scenario_id != ?")
+                params.append(keep_scenario_id)
+            rows = connection.execute(
+                f"SELECT id FROM daily_sessions WHERE {' AND '.join(clauses)}",
+                params,
+            ).fetchall()
+            ids = [row["id"] for row in rows]
+            for session_id in ids:
+                connection.execute(
+                    "DELETE FROM inline_feedback WHERE session_id = ?", (session_id,)
+                )
+                connection.execute(
+                    "DELETE FROM conversation_turns WHERE session_id = ?", (session_id,)
+                )
+                connection.execute(
+                    "DELETE FROM daily_sessions WHERE id = ?", (session_id,)
+                )
+            connection.commit()
+            return len(ids)
+
 
     def get_sessions(self, profile_id: int | None = None, limit: int = 60) -> list[dict[str, Any]]:
         """历史对话场景列表：优先按会话 profile_id 过滤，旧会话回退到 plan_day 归属。"""

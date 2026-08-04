@@ -2,6 +2,7 @@
 
 - 模型目录由环境变量 ASR_MODEL_DIR 指定，默认 <项目根>/data/asr_model/ 下优先 whisper 模型
 - 音频解码用 miniaudio（支持 MP3/WAV/OGG → 16kHz 单声道 float32）
+- 识别前做音量归一化（小音量放大），提升小声说话的识别率
 - 支持三种模型形态：流式 zipformer（OnlineRecognizer）、非流式 zipformer（OfflineRecognizer）、whisper（OfflineRecognizer）
 """
 import os
@@ -15,6 +16,10 @@ try:
 except ImportError:  # pragma: no cover - 仅保证模块在未安装依赖时可导入
     np = None
     sherpa_onnx = None
+
+# 音量归一化参数：峰值低于 TARGET_PEAK 时放大到该值，最大增益封顶避免噪声/爆音失控
+TARGET_PEAK = 0.9
+MAX_VOLUME_GAIN = 12.0
 
 
 def _default_model_dir() -> Path:
@@ -108,6 +113,7 @@ class AsrEngine:
     def transcribe_audio(self, audio_bytes: bytes) -> dict:
         """解码音频并识别，返回 {"text": str, "provider": "local-sherpa-onnx", "confidence": float}"""
         samples = decode_audio_to_float32(audio_bytes, self.sample_rate)
+        samples = normalize_volume(samples)
         if len(samples) == 0:
             return {"text": "", "provider": "local-sherpa-onnx", "confidence": 0.0}
 
@@ -143,6 +149,22 @@ def decode_audio_to_float32(audio_bytes: bytes, sample_rate: int = 16000) -> "np
         sample_rate=sample_rate,
     )
     return np.frombuffer(decoded.samples, dtype=np.float32)
+
+
+def normalize_volume(samples: "np.ndarray") -> "np.ndarray":
+    """峰值归一化：小音量线性放大，大音量保持原样。
+
+    - 峰值接近 0（几乎纯静音/噪声）时原样返回，避免放大环境噪声
+    - 峰值低于 TARGET_PEAK 时放大到 TARGET_PEAK，但增益封顶 MAX_VOLUME_GAIN，
+      防止把尖峰爆音推到削波
+    """
+    if np is None or len(samples) == 0:
+        return samples
+    peak = float(np.max(np.abs(samples)))
+    if peak < 1e-4 or peak >= TARGET_PEAK:
+        return samples
+    gain = min(TARGET_PEAK / peak, MAX_VOLUME_GAIN)
+    return samples * gain
 
 
 _engine: AsrEngine | None = None

@@ -114,6 +114,7 @@ def test_complete_session_marks_plan_day_completed(tmp_path, monkeypatch):
         "/api/onboarding",
         json={"learning_goal": "Travel English", "total_days": 1, "daily_minutes": 15, "current_level": "A2"},
     )
+    profile_id = onboarding.json()["profile"]["id"]
     plan_day_id = onboarding.json()["plan"][0]["id"]
     start = client.post("/api/sessions/start", json={"plan_day_id": plan_day_id})
     session_id = start.json()["session"]["id"]
@@ -126,6 +127,50 @@ def test_complete_session_marks_plan_day_completed(tmp_path, monkeypatch):
     assert body["completion"]["status"] == "completed"
     assert body["completion"]["completed_summary"]["completion_type"] == "manual"
     assert body["plan_day"]["status"] == "completed"
+    # 分数结算：100 分制，纠错后扣分（fake provider 生成 1 条 correction）
+    assert 0 < body["completion"]["completed_summary"]["score"] <= 100
+    assert "错误" in body["completion"]["completed_summary"]["score_detail_zh"] or "未发现明显错误" in body["completion"]["completed_summary"]["score_detail_zh"]
+
+    # 练习记录应包含本次得分与难度等级
+    history = client.get(f"/api/sessions?profile_id={profile_id}")
+    session_item = history.json()["sessions"][0]
+    assert session_item["score"] == body["completion"]["completed_summary"]["score"]
+    assert session_item["difficulty"] == "A2"
+
+
+def test_early_farewell_completion_not_counted_and_no_score(tmp_path, monkeypatch):
+    """前 3 轮内用户说 goodbye 结束：无得分、计划不推进（不计入练习）、练习记录保留无分数。"""
+    db_path = tmp_path / "coach.sqlite"
+    monkeypatch.setenv("COACH_DB_PATH", str(db_path))
+    monkeypatch.setenv("LLM_PROVIDER", "fake")
+    client = TestClient(app)
+    onboarding = client.post(
+        "/api/onboarding",
+        json={"learning_goal": "Travel English", "total_days": 1, "daily_minutes": 15, "current_level": "A2"},
+    )
+    profile_id = onboarding.json()["profile"]["id"]
+    plan_day_id = onboarding.json()["plan"][0]["id"]
+    start = client.post("/api/sessions/start", json={"plan_day_id": plan_day_id})
+    session_id = start.json()["session"]["id"]
+    client.post("/api/sessions/turn", json={"session_id": session_id, "text": "Hi, see you!"})
+
+    response = client.post(f"/api/sessions/{session_id}/complete", json={"completion_type": "manual"})
+
+    assert response.status_code == 200
+    body = response.json()
+    summary = body["completion"]["completed_summary"]
+    # 无得分：summary 里不含 score 字段
+    assert "score" not in summary
+    assert "score_detail_zh" not in summary
+    assert "不计入练习" in summary["summary_zh"]
+    # 计划不推进：plan_day 保持非 completed
+    assert body["plan_day"]["status"] != "completed"
+    # 练习记录保留该条，但无分数
+    history = client.get(f"/api/sessions?profile_id={profile_id}")
+    session_item = history.json()["sessions"][0]
+    assert session_item["id"] == session_id
+    assert session_item["score"] is None
+    assert session_item["difficulty"] == "A2"
 
 
 def test_complete_session_rejects_session_without_user_turn(tmp_path, monkeypatch):
@@ -270,13 +315,25 @@ def test_current_learning_state_returns_latest_profile_and_plan(tmp_path, monkey
 
 
 def test_tts_returns_generated_audio(tmp_path, monkeypatch):
-    monkeypatch.setattr("app.routers.tts.synthesize_tts_audio", lambda text: bytes(200))
+    monkeypatch.setattr("app.routers.tts.synthesize_tts_audio", lambda text, voice=None: bytes(200))
     client = TestClient(app)
-    response = client.post("/api/tts", json={"text": "Hello"})
+    response = client.post("/api/tts", json={"text": "Hello", "voice": "en-US-AriaNeural"})
     
     assert response.status_code == 200
     assert response.headers["content-type"] == "audio/mpeg"
     assert len(response.content) > 100
+
+
+def test_tts_voices_marks_current_default(tmp_path, monkeypatch):
+    monkeypatch.setenv("TTS_VOICE", "en-US-JennyNeural")
+    client = TestClient(app)
+    response = client.get("/api/tts/voices")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["default_voice"] == "en-US-JennyNeural"
+    assert len(body["voices"]) >= 10
+    assert any(v["id"] == "en-US-JennyNeural" and v["default"] for v in body["voices"])
 
 def test_current_learning_state_cleans_legacy_configuration_summary(tmp_path, monkeypatch):
     db_path = tmp_path / "coach.sqlite"

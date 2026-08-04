@@ -9,8 +9,11 @@ from app.services.enhanced_turn import enhanced_user_turn
 from app.tts import synthesize_tts_audio
 
 
-def voice_turn(session_id: int, audio_bytes: bytes) -> dict:
-    """上传一段语音，返回识别文本、AI 回复、纠错报告与回复语音（MP3 base64）。"""
+def voice_turn(session_id: int, audio_bytes: bytes, voice: str | None = None) -> dict:
+    """上传一段语音，返回识别文本、AI 回复、纠错报告与回复语音（MP3 base64）。
+
+    voice 可选：指定陪练老师音色（edge-tts voice 名），为空时使用默认音色。
+    """
     result = get_engine().transcribe_audio(audio_bytes)
     user_text = result["text"].strip()
     if not user_text:
@@ -24,7 +27,7 @@ def voice_turn(session_id: int, audio_bytes: bytes) -> dict:
     tts_audio = b""
     tts_error = None
     try:
-        tts_audio = synthesize_tts_audio(turn_result["assistant_turn"]["text"])
+        tts_audio = synthesize_tts_audio(turn_result["assistant_turn"]["text"], voice=voice)
         if not tts_audio:
             tts_error = "empty audio returned by edge-tts"
     except Exception as exc:

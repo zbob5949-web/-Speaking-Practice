@@ -133,8 +133,17 @@ export async function startScenarioSession(scenarioId: string, profileId?: numbe
   return response.json();
 }
 
-export async function getScenarios(profileId?: number): Promise<ScenarioCatalog> {
-  const url = profileId ? `${API_BASE}/api/scenarios?profile_id=${profileId}` : `${API_BASE}/api/scenarios`;
+export async function getScenarios(
+  profileId?: number,
+  filters?: { category?: string; role?: string; tier?: string }
+): Promise<ScenarioCatalog> {
+  const params = new URLSearchParams();
+  if (profileId) params.set("profile_id", String(profileId));
+  if (filters?.category) params.set("category", filters.category);
+  if (filters?.role) params.set("role", filters.role);
+  if (filters?.tier) params.set("tier", filters.tier);
+  const query = params.toString();
+  const url = query ? `${API_BASE}/api/scenarios?${query}` : `${API_BASE}/api/scenarios`;
   const response = await fetch(url);
   if (!response.ok) {
     throw new Error("Failed to load scenarios");
@@ -404,6 +413,36 @@ export async function requestLanguageSupport(input: {
 
 let activeAudio: HTMLAudioElement | null = null;
 
+export type TTSVoice = {
+  id: string;
+  name: string;
+  gender: string;
+  accent: string;
+  description: string;
+  default?: boolean;
+};
+
+const VOICE_STORAGE_KEY = "speakmate-voice";
+
+/** 读取用户在设置中选择的陪练老师音色（无选择时返回 null，用后端默认音色）。 */
+export function getSelectedVoice(): string | null {
+  return localStorage.getItem(VOICE_STORAGE_KEY);
+}
+
+/** 保存用户选择的陪练老师音色。 */
+export function setSelectedVoice(voiceId: string): void {
+  localStorage.setItem(VOICE_STORAGE_KEY, voiceId);
+}
+
+/** 获取可选陪练老师音色列表（含后端当前默认音色）。 */
+export async function getTTSVoices(): Promise<{ voices: TTSVoice[]; default_voice: string }> {
+  const response = await fetch(`${API_BASE}/api/tts/voices`);
+  if (!response.ok) {
+    throw new Error("Failed to load voices");
+  }
+  return response.json();
+}
+
 /** 停止当前正在播放的任意音频（TTS / 语音条），用于切换界面时中断播放。 */
 export function stopActiveAudio(): void {
   if (activeAudio) {
@@ -429,11 +468,13 @@ export function playAudioFromUrl(url: string): Promise<void> {
   });
 }
 
-export async function playTTS(text: string): Promise<void> {
+export async function playTTS(text: string, voice?: string): Promise<void> {
+  const body: { text: string; voice?: string } = { text };
+  if (voice) body.voice = voice;
   const response = await fetch(`${API_BASE}/api/tts`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ text })
+    body: JSON.stringify(body)
   });
   if (!response.ok) {
     throw new Error("Failed to synthesize speech");

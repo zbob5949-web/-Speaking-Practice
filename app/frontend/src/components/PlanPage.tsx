@@ -1,7 +1,8 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { addFavorite, getLearningPath, getScenarios, removeFavorite } from "../api";
 import type { LearningPath, Scenario, ScenarioTier } from "../types";
 import { PageHeader, PrimaryButton, SecondaryButton } from "./ui";
+import { SCENARIO_IMAGES } from "./ScenarioPicker";
 
 /** 分类主题色：让卡片视觉区分更明显 */
 const CATEGORY_TINTS: Record<string, string> = {
@@ -22,9 +23,13 @@ type Props = {
   profileId?: number;
   activeScenarioId?: string | null;
   onStartScenario: (scenario: Scenario) => void;
+  /** 从学习路线开始：跳转到今日板块并开始第一张卡片练习 */
+  onStartPath?: (scenario: Scenario) => void;
+  /** 学习路线生成后回传给 App（用于完成后「继续下一张卡片」） */
+  onLearningPathGenerated?: (path: Scenario[] | null) => void;
 };
 
-export function PlanPage({ profileId, activeScenarioId, onStartScenario }: Props) {
+export function PlanPage({ profileId, activeScenarioId, onStartScenario, onStartPath, onLearningPathGenerated }: Props) {
   const [catalog, setCatalog] = useState<{ scenarios: Scenario[]; categories: string[]; roles: string[]; tiers: ScenarioTier[]; derivedTier: ScenarioTier["id"] | null } | null>(null);
   const [status, setStatus] = useState<"loading" | "ready" | "error">("loading");
   const [category, setCategory] = useState("");
@@ -35,7 +40,14 @@ export function PlanPage({ profileId, activeScenarioId, onStartScenario }: Props
 
   useEffect(() => {
     let cancelled = false;
-    getScenarios(profileId)
+    setStatus("loading");
+    // 分类/角色/难度变化时重新请求后端：
+    // 后端会把 difficulty 压缩到所选难度档位（如大神 → C1），每档返回全部 6 个场景
+    getScenarios(profileId, {
+      category: category || undefined,
+      role: role || undefined,
+      tier: tier || undefined,
+    })
       .then((result) => {
         if (!cancelled) {
           setCatalog({
@@ -54,20 +66,10 @@ export function PlanPage({ profileId, activeScenarioId, onStartScenario }: Props
     return () => {
       cancelled = true;
     };
-  }, [profileId]);
+  }, [profileId, category, role, tier]);
 
-  const filtered = useMemo(() => {
-    const items = catalog?.scenarios ?? [];
-    return items.filter((scenario) => {
-      if (category && scenario.category !== category) return false;
-      if (role && scenario.npc_role !== role) return false;
-      if (tier) {
-        const levels = catalog?.tiers.find((item) => item.id === tier)?.levels ?? [];
-        if (!levels.includes(scenario.difficulty?.level ?? "")) return false;
-      }
-      return true;
-    });
-  }, [catalog, category, role, tier]);
+  // 后端已按 分类/角色/难度 过滤并压缩难度档位，无需本地二次过滤
+  const filtered = catalog?.scenarios ?? [];
 
   async function generatePath(selectedTier: ScenarioTier["id"]) {
     setPathLoading(true);
@@ -75,6 +77,16 @@ export function PlanPage({ profileId, activeScenarioId, onStartScenario }: Props
     try {
       const result = await getLearningPath(selectedTier, profileId);
       setLearningPath(result);
+      onLearningPathGenerated?.(result.path ?? []);
+      // 选择路线后，跳转到今日板块开始第一张卡片练习
+      if ((result.path ?? []).length > 0) {
+        const first = result.path![0];
+        if (onStartPath) {
+          onStartPath(first);
+        } else {
+          onStartScenario(first);
+        }
+      }
     } catch {
       // 路线加载失败保持空
     } finally {
@@ -191,10 +203,24 @@ export function PlanPage({ profileId, activeScenarioId, onStartScenario }: Props
                     className="path-card"
                     key={scenario.id}
                     type="button"
-                    onClick={() => onStartScenario(scenario)}
+                    onClick={() => {
+                      if (onStartPath) {
+                        onStartPath(scenario);
+                      } else {
+                        onStartScenario(scenario);
+                      }
+                    }}
                   >
                     <span className="path-card-index">{index + 1}</span>
-                    <span className="scenario-card-media" aria-hidden="true" />
+                    <span
+                      className="scenario-card-media"
+                      aria-hidden="true"
+                      style={{
+                        backgroundImage: SCENARIO_IMAGES[scenario.id]
+                          ? `url("${SCENARIO_IMAGES[scenario.id]}")`
+                          : CATEGORY_TINTS[scenario.category] ?? undefined,
+                      }}
+                    />
                     <span className="scenario-level">{scenario.difficulty?.level ?? ""}</span>
                     <strong>{scenario.title}</strong>
                     <small>{scenario.category} · {scenario.npc_role}</small>
@@ -216,7 +242,11 @@ export function PlanPage({ profileId, activeScenarioId, onStartScenario }: Props
                 <div
                   className="scenario-tile-media"
                   aria-hidden="true"
-                  style={{ background: CATEGORY_TINTS[scenario.category] ?? undefined }}
+                  style={{
+                    backgroundImage: SCENARIO_IMAGES[scenario.id]
+                      ? `url("${SCENARIO_IMAGES[scenario.id]}")`
+                      : CATEGORY_TINTS[scenario.category] ?? undefined,
+                  }}
                 />
                 <span
                   className={scenario.is_favorite ? "scenario-favorite-btn scenario-favorite-btn-active" : "scenario-favorite-btn"}

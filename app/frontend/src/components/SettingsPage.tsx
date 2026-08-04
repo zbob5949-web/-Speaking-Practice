@@ -1,44 +1,27 @@
 import { useEffect, useState } from "react";
-import { getFavorites, getSessionHistory } from "../api";
-import type { Profile, Scenario, SessionHistoryItem } from "../types";
-import { PageHeader, SecondaryButton } from "./ui";
+import { PageHeader } from "./ui";
+import { getSelectedVoice, getTTSVoices, setSelectedVoice } from "../api";
+import type { TTSVoice } from "../api";
 
-type Props = {
-  profile: Profile;
-  onSelectScenario: (scenario: Scenario) => void;
-};
-
-function formatTime(value: string) {
-  return value ? value.replace("T", " ").slice(0, 16) : "";
-}
-
-export function SettingsPage({ profile, onSelectScenario }: Props) {
-  const [favorites, setFavorites] = useState<Scenario[]>([]);
-  const [history, setHistory] = useState<SessionHistoryItem[]>([]);
+export function SettingsPage() {
   const [bilingualEnabled, setBilingualEnabled] = useState(
     () => localStorage.getItem("speakmate-bilingual") !== "off"
   );
+  const [voices, setVoices] = useState<TTSVoice[]>([]);
+  const [defaultVoice, setDefaultVoice] = useState("");
+  const [selectedVoice, setSelected] = useState<string | null>(() => getSelectedVoice());
+  const [voiceError, setVoiceError] = useState("");
 
   useEffect(() => {
-    let cancelled = false;
-    getFavorites(profile.id)
+    getTTSVoices()
       .then((result) => {
-        if (!cancelled) setFavorites(result.favorites);
+        setVoices(result.voices);
+        setDefaultVoice(result.default_voice);
+        // 未手动选择过音色时，以当前默认音色为选中项
+        setSelected((current) => current || result.default_voice);
       })
-      .catch(() => {
-        if (!cancelled) setFavorites([]);
-      });
-    getSessionHistory(profile.id)
-      .then((result) => {
-        if (!cancelled) setHistory(result.sessions);
-      })
-      .catch(() => {
-        if (!cancelled) setHistory([]);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [profile.id]);
+      .catch(() => setVoiceError("音色列表加载失败，请确认后端已启动。"));
+  }, []);
 
   function toggleBilingual() {
     const next = !bilingualEnabled;
@@ -46,66 +29,21 @@ export function SettingsPage({ profile, onSelectScenario }: Props) {
     localStorage.setItem("speakmate-bilingual", next ? "on" : "off");
   }
 
+  function chooseVoice(voiceId: string) {
+    setSelected(voiceId);
+    setSelectedVoice(voiceId);
+  }
+
   return (
     <main className="page">
       <PageHeader
-        eyebrow="个人中心"
-        title="我的"
-        description={`${profile.learning_goal} · ${profile.current_level}`}
+        eyebrow="设置"
+        title="设置"
+        description="显示与朗读偏好、陪练老师音色，以及其他个性化选项。"
       />
 
-      <section className="profile-layout">
-        <div className="profile-column">
-          <section className="profile-card" aria-label="收藏">
-            <div className="profile-card-header">
-              <p className="section-label">收藏</p>
-              <h2>收藏的场景</h2>
-            </div>
-            {favorites.length === 0 ? (
-              <p className="muted">还没有收藏场景，去场景页点星标即可收藏。</p>
-            ) : (
-              <ul className="profile-scenario-list">
-                {favorites.map((scenario) => (
-                  <li key={scenario.id} className="profile-scenario-row">
-                    <div>
-                      <strong>{scenario.title}</strong>
-                      <span>{scenario.npc_role} · {scenario.difficulty?.level ?? "A2"}</span>
-                    </div>
-                    <SecondaryButton type="button" onClick={() => onSelectScenario(scenario)}>
-                      开始
-                    </SecondaryButton>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </section>
-
-          <section className="profile-card" aria-label="历史对话场景">
-            <div className="profile-card-header">
-              <p className="section-label">历史对话场景</p>
-              <h2>练习记录</h2>
-            </div>
-            {history.length === 0 ? (
-              <p className="muted">还没有练习记录，开始第一次对话吧。</p>
-            ) : (
-              <ul className="profile-history-list">
-                {history.slice(0, 30).map((item) => (
-                  <li key={item.id} className="profile-history-row">
-                    <div>
-                      <strong>{item.topic}</strong>
-                      <span>
-                        {formatTime(item.started_at)} · {item.turn_count} 轮 ·{" "}
-                        {item.ended_at ? "已结束" : "进行中"}
-                      </span>
-                    </div>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </section>
-        </div>
-
-        <aside className="profile-column profile-column-aside">
+      <section className="profile-layout settings-layout">
+        <div className="profile-column profile-column-aside">
           <section className="profile-card" aria-label="设置">
             <div className="profile-card-header">
               <p className="section-label">设置</p>
@@ -127,6 +65,35 @@ export function SettingsPage({ profile, onSelectScenario }: Props) {
             </div>
           </section>
 
+          <section className="profile-card" aria-label="陪练老师">
+            <div className="profile-card-header">
+              <p className="section-label">陪练老师</p>
+              <h2>音色</h2>
+            </div>
+            <p className="muted">选择 AI 回复朗读时的声音，当前音色为默认选项。</p>
+            {voiceError ? <p className="voice-error">{voiceError}</p> : null}
+            {voices.length > 0 ? (
+              <div className="voice-option-grid" role="radiogroup" aria-label="陪练老师音色">
+                {voices.map((voice) => (
+                  <button
+                    key={voice.id}
+                    type="button"
+                    role="radio"
+                    aria-checked={selectedVoice === voice.id}
+                    className={selectedVoice === voice.id ? "voice-option voice-option-active" : "voice-option"}
+                    onClick={() => chooseVoice(voice.id)}
+                  >
+                    <span className="voice-option-name">
+                      {voice.name}
+                      {voice.default && voice.id === defaultVoice ? <em className="voice-option-default">默认</em> : null}
+                    </span>
+                    <span className="voice-option-meta">{voice.gender} · {voice.accent} · {voice.description}</span>
+                  </button>
+                ))}
+              </div>
+            ) : null}
+          </section>
+
           <section className="profile-card" aria-label="关于">
             <div className="profile-card-header">
               <p className="section-label">关于</p>
@@ -134,7 +101,7 @@ export function SettingsPage({ profile, onSelectScenario }: Props) {
             </div>
             <p className="muted">场景口语陪练 · 按场景对话、实时语法纠错、难度随水平自适应。</p>
           </section>
-        </aside>
+        </div>
       </section>
     </main>
   );

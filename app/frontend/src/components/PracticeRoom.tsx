@@ -1,16 +1,20 @@
 ﻿import { useEffect, useRef, useState } from "react";
-import { clearSessionHistory, completeSession, deleteTurnPair, playAudioFromUrl, requestLanguageSupport, sendUserTurnStream, startScenarioSession, startSession, playTTS, stopActiveAudio, transcribeAudio, translateText } from "../api";
-import type { ConversationTurn, InlineFeedback, LanguageSupportMode, LanguageSupportResult, PlanDay, PracticeBrief, PracticeSession, Scenario, SessionCompletion, TargetExpression, TodayStrategy } from "../types";
+import { clearSessionHistory, completeSession, deleteTurnPair, getSelectedVoice, playAudioFromUrl, sendUserTurnStream, startScenarioSession, startSession, playTTS, stopActiveAudio, transcribeAudio, translateText } from "../api";
+import type { ConversationTurn, InlineFeedback, LanguageSupportResult, PlanDay, PracticeBrief, PracticeSession, Scenario, SessionCompletion, TargetExpression, TodayStrategy } from "../types";
 import { PrimaryButton, SecondaryButton } from "./ui";
 import { VoiceRecorder } from "./VoiceRecorder";
-import { ScenarioPicker } from "./ScenarioPicker";
+import { ScenarioPicker, SCENARIO_IMAGES } from "./ScenarioPicker";
 
 type Props = {
   day?: PlanDay | null;
   scenario?: Scenario | null;
   todayStrategy?: TodayStrategy | null;
   profileId?: number;
+  /** 当前学习路线（按水平生成的场景序列），用于完成后「继续下一张卡片」 */
+  learningPath?: Scenario[] | null;
   onSelectScenario?: (scenario: Scenario) => void;
+  /** 今日板块的自由对话入口 */
+  onFreeTalk?: () => void;
 };
 
 const ASSISTANT_AVATAR = "A";
@@ -59,14 +63,35 @@ function getCorrectionParts(item: InlineFeedback): CorrectionParts | null {
   return parseLegacyCorrection(item.feedback_text);
 }
 
-function FeedbackCard({ item }: { item: InlineFeedback }) {
+function FeedbackCard({ item, onLocate }: { item: InlineFeedback; onLocate?: (turnId: number) => void }) {
   const isGuidance = item.feedback_type === "guidance";
   const isLanguageHelp = item.feedback_type === "language_help";
   const correction = item.feedback_type === "correction" ? getCorrectionParts(item) : null;
+  const locatable = Boolean(onLocate && item.turn_id);
+  const locClass = locatable ? " feedback-card-locatable" : "";
+
+  const handleLocate = () => {
+    if (locatable && item.turn_id) onLocate?.(item.turn_id);
+  };
+
+  const locatableProps = locatable
+    ? {
+        onClick: handleLocate,
+        tabIndex: 0,
+        title: "点击定位到对应对话",
+        "aria-label": "点击定位到对应对话",
+        onKeyDown: (event: React.KeyboardEvent) => {
+          if (event.key === "Enter" || event.key === " ") {
+            event.preventDefault();
+            handleLocate();
+          }
+        },
+      }
+    : {};
 
   if (correction) {
     return (
-      <article className="feedback-card feedback-card-correction">
+      <article className={"feedback-card feedback-card-correction" + locClass} {...locatableProps}>
         <div className="feedback-card-header">
           <p className="feedback-card-label">你这里的问题</p>
           {item.severity === "major" ? <span className="feedback-severity">主要问题</span> : null}
@@ -98,7 +123,7 @@ function FeedbackCard({ item }: { item: InlineFeedback }) {
 
   if (isGuidance) {
     return (
-      <article className="feedback-card feedback-card-guidance">
+      <article className={"feedback-card feedback-card-guidance" + locClass} {...locatableProps}>
         <p className="feedback-card-label">下一步可以这样说</p>
         <p>{item.reason_zh || item.feedback_text}</p>
         {item.example_sentence ? <p className="feedback-example">{item.example_sentence}</p> : null}
@@ -108,7 +133,7 @@ function FeedbackCard({ item }: { item: InlineFeedback }) {
 
   if (isLanguageHelp) {
     return (
-      <article className="feedback-card feedback-card-language">
+      <article className={"feedback-card feedback-card-language" + locClass} {...locatableProps}>
         <p className="feedback-card-label">词义解答</p>
         {item.original_fragment ? <strong className="language-term">{item.original_fragment}</strong> : null}
         <p>{item.reason_zh || item.feedback_text}</p>
@@ -117,7 +142,11 @@ function FeedbackCard({ item }: { item: InlineFeedback }) {
     );
   }
 
-  return <p className="feedback-item">{item.feedback_text}</p>;
+  return (
+    <p className={"feedback-item" + locClass} {...locatableProps}>
+      {item.feedback_text}
+    </p>
+  );
 }
 
 function LanguageSupportCard({ result }: { result: LanguageSupportResult }) {
@@ -155,27 +184,62 @@ function ExpressionCard({ expression }: { expression: TargetExpression }) {
   );
 }
 
-export function PracticeRoom({ day, scenario, todayStrategy, profileId, onSelectScenario }: Props) {
+export function PracticeRoom({ day, scenario, todayStrategy, profileId, learningPath, onSelectScenario, onFreeTalk }: Props) {
   const [session, setSession] = useState<PracticeSession | null>(null);
   const [turns, setTurns] = useState<ConversationTurn[]>([]);
   const [feedbackTimeline, setFeedbackTimeline] = useState<FeedbackTimelineItem[]>([]);
   const [practiceBrief, setPracticeBrief] = useState<PracticeBrief | null>(null);
   const [completion, setCompletion] = useState<SessionCompletion | null>(null);
   const [lessonPhase, setLessonPhase] = useState<LessonPhase>("practice");
-  const [hints, setHints] = useState<string[]>([]);
   const [typedText, setTypedText] = useState("");
   const [apiError, setApiError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [streamingReply, setStreamingReply] = useState<string | null>(null);
   const [deletingTurnId, setDeletingTurnId] = useState<number | null>(null);
-  const [selectedText, setSelectedText] = useState("");
-  const [languageSupport, setLanguageSupport] = useState<LanguageSupportResult | null>(null);
-  const [latestLanguageSupportItemId, setLatestLanguageSupportItemId] = useState("");
-  const [isLanguageSupportLoading, setIsLanguageSupportLoading] = useState(false);
   const [isCompletingSession, setIsCompletingSession] = useState(false);
   const [isClearingHistory, setIsClearingHistory] = useState(false);
   const [dismissedCompletionSuggestion, setDismissedCompletionSuggestion] = useState(false);
   const [bilingualEnabled, setBilingualEnabled] = useState(() => localStorage.getItem("speakmate-bilingual") !== "off");
+  // AI 回复自动朗读：默认开启，可一键静音（持久化到 localStorage）
+  const [ttsMuted, setTtsMuted] = useState(() => localStorage.getItem("speakmate-tts-muted") === "on");
+  const ttsMutedRef = useRef(ttsMuted);
+  // 正在朗读的 AI 文字条 turn id：用于显示波峰谷跳动样式
+  const [ttsSpeakingTurnId, setTtsSpeakingTurnId] = useState<number | null>(null);
+  // 电话模式：自动录音循环对话，无需手动发消息
+  const [phoneMode, setPhoneMode] = useState(false);
+  const phoneModeRef = useRef(false);
+  const [autoRecordSignal, setAutoRecordSignal] = useState(0);
+  const nextRecordingTimerRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    phoneModeRef.current = phoneMode;
+  }, [phoneMode]);
+
+  const triggerNextRecording = () => {
+    if (!phoneModeRef.current) return;
+    setAutoRecordSignal((n) => n + 1);
+  };
+
+  const scheduleNextRecording = () => {
+    if (!phoneModeRef.current || isSubmittingRef.current) return;
+    if (nextRecordingTimerRef.current !== null) return;
+    nextRecordingTimerRef.current = window.setTimeout(() => {
+      nextRecordingTimerRef.current = null;
+      triggerNextRecording();
+    }, 500);
+  };
+
+  const togglePhoneMode = () => {
+    const next = !phoneMode;
+    setPhoneMode(next);
+    if (next) {
+      // 进入电话模式：稍后开始第一轮自动录音
+      nextRecordingTimerRef.current = window.setTimeout(() => {
+        nextRecordingTimerRef.current = null;
+        triggerNextRecording();
+      }, 400);
+    }
+  };
   const [translations, setTranslations] = useState<Record<number, string>>({});
   const [voiceTurnIds, setVoiceTurnIds] = useState<Set<number>>(new Set());
   const [voiceMeta, setVoiceMeta] = useState<Map<number, { durationMs: number }>>(new Map());
@@ -183,13 +247,45 @@ export function PracticeRoom({ day, scenario, todayStrategy, profileId, onSelect
   const [voiceAudioUrls, setVoiceAudioUrls] = useState<Map<number, string>>(new Map());
   const [voiceTexts, setVoiceTexts] = useState<Map<number, string>>(new Map());
   const isSubmittingRef = useRef(false);
-  const languageSupportIdRef = useRef(0);
+  const isCompleted = completion?.status === "completed";
+  // 实时纠错定位：点击反馈卡片后高亮并滚动到对应对话回合
+  const [highlightedTurnId, setHighlightedTurnId] = useState<number | null>(null);
+  const highlightTimerRef = useRef<number | null>(null);
+
+  const locateTurn = (turnId: number) => {
+    setHighlightedTurnId(turnId);
+    if (highlightTimerRef.current !== null) {
+      window.clearTimeout(highlightTimerRef.current);
+    }
+    highlightTimerRef.current = window.setTimeout(() => setHighlightedTurnId(null), 1600);
+    document
+      .querySelector(`[data-turn-id="${turnId}"]`)
+      ?.scrollIntoView({ behavior: "smooth", block: "center" });
+  };
+
+  // 消息气泡纠错感叹号：展开该条消息对应的实时纠错
+  const [openFeedbackTurnId, setOpenFeedbackTurnId] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (openFeedbackTurnId === null) return;
+    const handler = (event: PointerEvent) => {
+      const target = event.target as HTMLElement | null;
+      if (target && !target.closest(".message-feedback-pop") && !target.closest(".feedback-alert")) {
+        setOpenFeedbackTurnId(null);
+      }
+    };
+    document.addEventListener("pointerdown", handler);
+    return () => document.removeEventListener("pointerdown", handler);
+  }, [openFeedbackTurnId]);
 
   const feedbackEndRef = useRef<HTMLDivElement>(null);
-  const languageSupportRef = useRef<HTMLDivElement>(null);
+  const chatScrollRef = useRef<HTMLDivElement>(null);
   const isFeedbackAtBottomRef = useRef(true);
 
   const isScenarioMode = Boolean(scenario);
+  const isFreeTalk = scenario?.id === "free_talk";
+  // 当前场景板块的背景图：有对应图片时显示为封面背景
+  const topicImage = scenario ? SCENARIO_IMAGES[scenario.id] : undefined;
 
   const handleFeedbackScroll = (e: React.UIEvent<HTMLElement>) => {
     const target = e.currentTarget;
@@ -204,11 +300,12 @@ export function PracticeRoom({ day, scenario, todayStrategy, profileId, onSelect
     }
   }, [feedbackTimeline]);
 
+  // 完成练习后：把对话区滚到底，让对话流末尾的总结卡片可见
   useEffect(() => {
-    if (languageSupport && languageSupportRef.current) {
-      languageSupportRef.current.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    if (isCompleted && chatScrollRef.current) {
+      chatScrollRef.current.scrollTop = chatScrollRef.current.scrollHeight;
     }
-  }, [languageSupport, latestLanguageSupportItemId]);
+  }, [isCompleted]);
 
   // TTS 播放：合并相邻句子，减少句间停顿
   const audioBufferRef = useRef("");
@@ -218,21 +315,32 @@ export function PracticeRoom({ day, scenario, todayStrategy, profileId, onSelect
   const processedTextLenRef = useRef(0);
 
   const playNextAudio = async () => {
-    if (isPlayingAudioRef.current || audioQueueRef.current.length === 0) return;
-    isPlayingAudioRef.current = true;
+    if (isPlayingAudioRef.current) return;
     const textToPlay = audioQueueRef.current.shift();
-    if (textToPlay) {
-      try {
-        await playTTS(textToPlay);
-      } catch (e) {
-        console.warn("Chunk TTS failed", e);
+    if (!textToPlay) {
+      // 队列空：AI 已说完，电话模式下自动衔接下一轮录音
+      if (phoneModeRef.current && !isSubmittingRef.current && !ttsMutedRef.current) {
+        scheduleNextRecording();
       }
+      if (!audioBufferRef.current) {
+        // 缓冲也已清空：朗读结束，移除波峰谷跳动样式
+        setTtsSpeakingTurnId(null);
+      }
+      return;
+    }
+    isPlayingAudioRef.current = true;
+    try {
+      // 使用设置中选择的陪练老师音色；未选择时后端使用默认音色
+      await playTTS(textToPlay, getSelectedVoice() ?? undefined);
+    } catch (e) {
+      console.warn("Chunk TTS failed", e);
     }
     isPlayingAudioRef.current = false;
     void playNextAudio();
   };
 
   const queueAudioText = (text: string) => {
+    if (ttsMutedRef.current) return; // 静音：AI 回复不再自动朗读
     const cleanText = text.trim();
     if (!cleanText) return;
     // 相邻句子合并到同一播放单元，缩短两句话之间的停顿
@@ -253,6 +361,12 @@ export function PracticeRoom({ day, scenario, todayStrategy, profileId, onSelect
     if (audioFlushTimerRef.current !== null) {
       window.clearTimeout(audioFlushTimerRef.current);
     }
+    if (highlightTimerRef.current !== null) {
+      window.clearTimeout(highlightTimerRef.current);
+    }
+    if (nextRecordingTimerRef.current !== null) {
+      window.clearTimeout(nextRecordingTimerRef.current);
+    }
     // 组件卸载：停止正在播放的音频并释放语音条 blob URL
     stopActiveAudio();
     audioQueueRef.current = [];
@@ -262,6 +376,17 @@ export function PracticeRoom({ day, scenario, todayStrategy, profileId, onSelect
       return new Map();
     });
   }, []);
+
+  useEffect(() => {
+    ttsMutedRef.current = ttsMuted;
+    if (ttsMuted) {
+      // 一键静音：立刻停止正在播放的语音并清空待播队列
+      stopActiveAudio();
+      audioQueueRef.current = [];
+      audioBufferRef.current = "";
+      setTtsSpeakingTurnId(null);
+    }
+  }, [ttsMuted]);
 
   useEffect(() => {
     async function boot() {
@@ -274,13 +399,11 @@ export function PracticeRoom({ day, scenario, todayStrategy, profileId, onSelect
         setTurns(result.turns);
         const feedbackHistory = result.feedback_history || [];
         setFeedbackTimeline(feedbackTimelineItems(feedbackHistory));
-        setLanguageSupport(null);
-        setLatestLanguageSupportItemId("");
         setPracticeBrief(result.practice_brief || null);
         setCompletion(result.completion || null);
         const hasUserTurns = result.turns.some((turn) => turn.speaker === "user");
-        setLessonPhase(result.practice_brief && !hasUserTurns ? "learn" : "practice");
-        setHints([]);
+        // 自由对话直接进入对话，跳过课程简报
+        setLessonPhase(result.practice_brief && !hasUserTurns && scenario?.id !== "free_talk" ? "learn" : "practice");
         setTranslations({});
         setVoiceTurnIds(new Set());
         setVoiceMeta(new Map());
@@ -297,11 +420,11 @@ export function PracticeRoom({ day, scenario, todayStrategy, profileId, onSelect
     void boot();
   }, [scenario?.id, day?.id]);
 
-  // 双语展示：按需为 assistant 消息生成中文翻译（缓存）
+  // 双语展示：按需为消息生成中文翻译（缓存；电话模式下双方消息都翻译）
   useEffect(() => {
     if (!bilingualEnabled) return;
     const pending = turns.filter(
-      (turn) => turn.speaker === "assistant" && !(turn.id in translations)
+      (turn) => !(turn.id in translations)
     );
     if (pending.length === 0) return;
     let cancelled = false;
@@ -332,7 +455,6 @@ export function PracticeRoom({ day, scenario, todayStrategy, profileId, onSelect
     isSubmittingRef.current = true;
     setIsSubmitting(true);
     setApiError("");
-    setHints([]); // clear old hints
 
     // 语音条模式：复用已在对话里的语音条作为本轮用户消息（文字内容隐式携带）
     const existingVoiceTurn = voiceTempId ? turns.find((turn) => turn.id === voiceTempId) : undefined;
@@ -386,6 +508,7 @@ export function PracticeRoom({ day, scenario, todayStrategy, profileId, onSelect
       setStreamingReply(null); // clear streaming reply
 
       // Stream done, replace temp turns with real ones
+      const fallbackAssistantId = Date.now() + 1;
       setTurns((current) => {
         const withoutTemp = current.filter(t => t.id !== tempUserTurn.id);
 
@@ -397,7 +520,7 @@ export function PracticeRoom({ day, scenario, todayStrategy, profileId, onSelect
         // Resilience: if meta failed (e.g. backend feedback generation timeout),
         // we synthesize a temporary assistant turn so the text isn't lost.
         const fallbackAssistantTurn: ConversationTurn = {
-          id: Date.now() + 1,
+          id: fallbackAssistantId,
           session_id: session.id,
           turn_index: tempUserTurn.turn_index + 1,
           speaker: "assistant",
@@ -405,6 +528,12 @@ export function PracticeRoom({ day, scenario, todayStrategy, profileId, onSelect
         };
         return [...withoutTemp, tempUserTurn, fallbackAssistantTurn];
       });
+
+      // 标记正在朗读的 AI 文字条：TTS 队列/缓冲仍有内容时显示波峰谷跳动样式
+      const assistantId = result.assistant_turn ? result.assistant_turn.id : fallbackAssistantId;
+      if ((isPlayingAudioRef.current || audioQueueRef.current.length > 0 || audioBufferRef.current) && !ttsMutedRef.current) {
+        setTtsSpeakingTurnId(assistantId);
+      }
 
       if (result.inline_feedback && result.inline_feedback.length > 0) {
         setFeedbackTimeline(current => [...current, ...feedbackTimelineItems(result.inline_feedback)]);
@@ -444,7 +573,6 @@ export function PracticeRoom({ day, scenario, todayStrategy, profileId, onSelect
           return next;
         });
       }
-      setHints(result.hints || []);
       if (result.completion) {
         setCompletion(result.completion);
         if (result.completion.status === "completion_suggested") {
@@ -474,6 +602,10 @@ export function PracticeRoom({ day, scenario, todayStrategy, profileId, onSelect
     } finally {
       isSubmittingRef.current = false;
       setIsSubmitting(false);
+      // 电话模式且已静音：AI 不播语音，文本显示即视为说完，直接衔接下一轮录音
+      if (phoneModeRef.current && ttsMutedRef.current) {
+        scheduleNextRecording();
+      }
     }
   }
 
@@ -518,8 +650,12 @@ export function PracticeRoom({ day, scenario, todayStrategy, profileId, onSelect
     }
   }
 
-  async function handleReplay(text: string) {
+  async function handleReplay(text: string, turnId?: number) {
     queueAudioText(text);
+    // 重播时同样标记该文字条为正在朗读
+    if (turnId != null && !ttsMutedRef.current) {
+      setTtsSpeakingTurnId(turnId);
+    }
   }
 
   async function handleDeleteTurnPair(userTurnId: number) {
@@ -561,9 +697,7 @@ export function PracticeRoom({ day, scenario, todayStrategy, profileId, onSelect
   }
   async function handleCompleteSession(completionType: "manual" | "agent_suggested" = "manual") {
     if (!session || isCompletingSession) return;
-    const shouldComplete = window.confirm(isScenarioMode ? "确定结束这次场景练习吗？系统会生成本次总结。" : "确定结束今天的练习吗？系统会生成今日总结，并把这一天标记为已完成。");
-    if (!shouldComplete) return;
-
+    // 直接结束并总结，不再弹二次确认
     setIsCompletingSession(true);
     setApiError("");
     try {
@@ -574,34 +708,6 @@ export function PracticeRoom({ day, scenario, todayStrategy, profileId, onSelect
       setApiError("生成今日总结失败，请稍后再试。")
     } finally {
       setIsCompletingSession(false);
-    }
-  }
-
-  function handleConversationSelection() {
-    const selection = window.getSelection();
-    const text = selection?.toString().trim() || "";
-    if (text.length < 2) return;
-    setSelectedText(text.slice(0, 240));
-  }
-
-  async function handleLanguageSupport(mode: LanguageSupportMode = "explain") {
-    if (!selectedText) return;
-    setIsLanguageSupportLoading(true);
-    setApiError("");
-    try {
-      const context = turns.map((turn) => `${turn.speaker}: ${turn.text}`).join("\n").slice(-1200);
-      const result = await requestLanguageSupport({ mode, text: selectedText, context });
-      const itemId = `language-${Date.now()}-${languageSupportIdRef.current}`;
-      languageSupportIdRef.current += 1;
-      setLanguageSupport(result);
-      setLatestLanguageSupportItemId(itemId);
-      setFeedbackTimeline(current => [...current, { kind: "language", id: itemId, result }]);
-      setSelectedText("");
-      window.getSelection()?.removeAllRanges();
-    } catch {
-      setApiError("获取中文解释失败，请稍后再试。")
-    } finally {
-      setIsLanguageSupportLoading(false);
     }
   }
 
@@ -663,8 +769,14 @@ export function PracticeRoom({ day, scenario, todayStrategy, profileId, onSelect
   }
 
   const hasUserTurn = turns.some((turn) => turn.speaker === "user");
-  const isCompleted = completion?.status === "completed";
+  // 学习路线：当前场景在路线中的位置，用于完成后「继续下一张卡片」
+  const pathIndex = learningPath && scenario ? learningPath.findIndex((item) => item.id === scenario.id) : -1;
+  const nextPathItem =
+    pathIndex >= 0 && pathIndex < (learningPath?.length ?? 0) - 1
+      ? (learningPath?.[pathIndex + 1] ?? null)
+      : null;
   const showCompletionSuggestion =
+    !isFreeTalk &&
     completion?.status === "completion_suggested" &&
     completion.can_suggest_completion &&
     !dismissedCompletionSuggestion &&
@@ -675,7 +787,7 @@ export function PracticeRoom({ day, scenario, todayStrategy, profileId, onSelect
       {apiError ? <p className="error-message" role="alert">{apiError}</p> : null}
       <section className="practice-workspace">
         <div className="practice-main">
-          {onSelectScenario ? (
+          {onSelectScenario && !isScenarioMode ? (
             <ScenarioPicker
               profileId={profileId}
               activeScenarioId={scenario?.id ?? null}
@@ -683,7 +795,11 @@ export function PracticeRoom({ day, scenario, todayStrategy, profileId, onSelect
               faded={hasUserTurn}
             />
           ) : null}
-          <section className="topic-strip" aria-label="今日场景">
+          <section
+            className={"topic-strip" + (topicImage ? " topic-strip-cover" : "")}
+            aria-label={isScenarioMode ? "当前场景" : "今日场景"}
+            style={topicImage ? { backgroundImage: `url("${topicImage}")` } : undefined}
+          >
             <div>
               <p>{isScenarioMode ? "当前场景" : "今日场景"}</p>
               <h1>{scenario?.title ?? day?.topic}</h1>
@@ -704,6 +820,35 @@ export function PracticeRoom({ day, scenario, todayStrategy, profileId, onSelect
               >
                 双语 {bilingualEnabled ? "开" : "关"}
               </button>
+              <button
+                className={ttsMuted ? "tts-toggle tts-toggle-muted" : "tts-toggle"}
+                type="button"
+                aria-pressed={!ttsMuted}
+                aria-label={ttsMuted ? "语音已静音，点击开启自动朗读" : "AI 回复自动朗读中，点击静音"}
+                onClick={() => {
+                  setTtsMuted((value) => {
+                    const next = !value;
+                    localStorage.setItem("speakmate-tts-muted", next ? "on" : "off");
+                    return next;
+                  });
+                }}
+              >
+                {ttsMuted ? "语音 关" : "语音 开"}
+              </button>
+              <button
+                className={phoneMode ? "phone-mode-btn phone-mode-btn-active" : "phone-mode-btn"}
+                type="button"
+                aria-pressed={phoneMode}
+                aria-label={phoneMode ? "挂断电话模式" : "开启电话模式"}
+                onClick={togglePhoneMode}
+              >
+                {phoneMode ? "挂断" : "电话模式"}
+              </button>
+              {onFreeTalk ? (
+                <SecondaryButton type="button" onClick={onFreeTalk}>
+                  自由对话
+                </SecondaryButton>
+              ) : null}
               {practiceBrief ? (
                 <SecondaryButton type="button" onClick={() => setLessonPhase("learn")}>
                   查看场景提示
@@ -725,9 +870,19 @@ export function PracticeRoom({ day, scenario, todayStrategy, profileId, onSelect
             </div>
           </section>
 
+          {phoneMode ? (
+            <div className="phone-mode-bar" role="status" aria-label="电话模式状态">
+              <span className="phone-mode-pulse" aria-hidden="true" />
+              <span>电话模式 · 正在聆听，说完请稍作停顿</span>
+              <button type="button" className="phone-mode-hangup" onClick={() => setPhoneMode(false)}>
+                挂断
+              </button>
+            </div>
+          ) : null}
+
           <section className="chat-card">
-            <div className="chat-thread" aria-label="对话练习" onMouseUp={handleConversationSelection}>
-              <div className="chat-scroll">
+            <div className="chat-thread" aria-label="对话练习">
+              <div className="chat-scroll" ref={chatScrollRef}>
                 {turns.map((turn) => {
                   const isUser = turn.speaker === "user";
                   const nextTurn = turns.find((item) => item.turn_index === turn.turn_index + 1);
@@ -736,8 +891,19 @@ export function PracticeRoom({ day, scenario, todayStrategy, profileId, onSelect
                   const isVoice = isUser && voiceTurnIds.has(turn.id);
                   const voiceDuration = voiceMeta.get(turn.id)?.durationMs ?? 0;
                   const voiceFailed = voiceFailedIds.has(turn.id);
+                  // 该消息对应的纠错（仅 correction 视为「存在错误」）
+                  const turnFeedbackItems = isUser
+                    ? feedbackTimeline.filter(
+                        (tl): tl is Extract<FeedbackTimelineItem, { kind: "feedback" }> =>
+                          tl.kind === "feedback" && tl.item.turn_id === turn.id && tl.item.feedback_type === "correction",
+                      )
+                    : [];
                   return (
-                    <article className={isUser ? "message-row message-row-user" : "message-row"} key={turn.id}>
+                    <article
+                      className={(isUser ? "message-row message-row-user" : "message-row") + (highlightedTurnId === turn.id ? " message-row-highlight" : "")}
+                      key={turn.id}
+                      data-turn-id={turn.id}
+                    >
                       {!isUser ? (
                         <div className="message-avatar message-avatar-assistant" aria-hidden="true">
                           {ASSISTANT_AVATAR}
@@ -756,7 +922,7 @@ export function PracticeRoom({ day, scenario, todayStrategy, profileId, onSelect
                           </button>
                         </div>
                       ) : null}
-                      <div className={isUser ? "message-bubble message-bubble-user" : "message-bubble message-bubble-assistant"}>
+                      <div className={(isUser ? "message-bubble message-bubble-user" : "message-bubble message-bubble-assistant") + (turn.id === ttsSpeakingTurnId ? " message-bubble-speaking" : "")}>
                         {isVoice ? (
                           <span
                             className="voice-bubble"
@@ -778,12 +944,30 @@ export function PracticeRoom({ day, scenario, todayStrategy, profileId, onSelect
                             {voiceFailed ? <span className="voice-bubble-failed">未识别</span> : null}
                           </span>
                         ) : (
-                          <p>{turn.text}</p>
+                          <>
+                            <p>{turn.text}</p>
+                            {turn.id === ttsSpeakingTurnId ? (
+                              <span className="speaking-wave" aria-hidden="true">
+                                <i /><i /><i /><i />
+                              </span>
+                            ) : null}
+                          </>
                         )}
                         {isVoice && !voiceFailed && voiceTexts.get(turn.id) ? (
                           <p className="voice-bubble-text">{voiceTexts.get(turn.id)}</p>
                         ) : null}
-                        {!isUser && translation ? <p className="message-translation">{translation}</p> : null}
+                        {translation ? <p className={"message-translation" + (isUser ? " message-translation-user" : "")}>{translation}</p> : null}
+                        {isUser && turnFeedbackItems.length > 0 ? (
+                          <button
+                            type="button"
+                            className={"feedback-alert" + (openFeedbackTurnId === turn.id ? " feedback-alert-active" : "")}
+                            aria-label={openFeedbackTurnId === turn.id ? "收起实时纠错" : "查看这条消息的实时纠错"}
+                            aria-expanded={openFeedbackTurnId === turn.id}
+                            onClick={() => setOpenFeedbackTurnId(openFeedbackTurnId === turn.id ? null : turn.id)}
+                          >
+                            !
+                          </button>
+                        ) : null}
                       </div>
                       {!isUser ? (
                         <div className="message-actions message-actions-assistant" role="group" aria-label="消息操作">
@@ -791,7 +975,7 @@ export function PracticeRoom({ day, scenario, todayStrategy, profileId, onSelect
                             className="message-action-button message-replay-button"
                             type="button"
                             aria-label="播放教练语音"
-                            onClick={() => handleReplay(turn.text)}
+                            onClick={() => handleReplay(turn.text, turn.id)}
                           >
                             播
                           </button>
@@ -800,6 +984,19 @@ export function PracticeRoom({ day, scenario, todayStrategy, profileId, onSelect
                       {isUser ? (
                         <div className="message-avatar message-avatar-user" aria-hidden="true">
                           {USER_AVATAR}
+                        </div>
+                      ) : null}
+                      {isUser && openFeedbackTurnId === turn.id && turnFeedbackItems.length > 0 ? (
+                        <div className="message-feedback-pop" role="region" aria-label="实时纠错">
+                          <div className="message-feedback-pop-head">
+                            <span>实时纠错</span>
+                            <button type="button" onClick={() => setOpenFeedbackTurnId(null)}>
+                              收起
+                            </button>
+                          </div>
+                          {turnFeedbackItems.map((tl) => (
+                            <FeedbackCard item={tl.item} key={tl.id} />
+                          ))}
                         </div>
                       ) : null}
                     </article>
@@ -813,33 +1010,43 @@ export function PracticeRoom({ day, scenario, todayStrategy, profileId, onSelect
                     </div>
                   </article>
                 )}
+                {completion?.status === "completed" && completion.completed_summary ? (
+                  <section className="feedback-card feedback-card-guidance completion-summary-card" aria-label="今日总结">
+                    <p className="feedback-card-label">练习已完成，但仍可继续对话</p>
+                    <p>{completion.completed_summary.summary_zh}</p>
+                    {completion.completed_summary.score !== undefined ? (
+                      <p className="completion-score">
+                        本次练习得分：<strong>{completion.completed_summary.score} / 100</strong>
+                        {completion.completed_summary.score_detail_zh ? (
+                          <span className="completion-score-detail">{completion.completed_summary.score_detail_zh}</span>
+                        ) : null}
+                      </p>
+                    ) : null}
+                    <p className="feedback-reason"><span>做得好的点：</span>{completion.completed_summary.strength_zh}</p>
+                    <p className="feedback-reason"><span>下次重点：</span>{completion.completed_summary.next_focus_zh}</p>
+                    {completion.completed_summary.reusable_sentences.length > 0 ? (
+                      <p className="feedback-example">{completion.completed_summary.reusable_sentences[0]}</p>
+                    ) : null}
+                    {nextPathItem || onFreeTalk ? (
+                      <div className="topic-strip-actions continuation-actions">
+                        {nextPathItem ? (
+                          <PrimaryButton type="button" onClick={() => onSelectScenario?.(nextPathItem)}>
+                            继续下一张卡片
+                          </PrimaryButton>
+                        ) : null}
+                        {onFreeTalk ? (
+                          <SecondaryButton type="button" onClick={onFreeTalk}>
+                            自由对话
+                          </SecondaryButton>
+                        ) : null}
+                      </div>
+                    ) : null}
+                  </section>
+                ) : null}
               </div>
-              {selectedText ? (
-                <div className="language-inline-popover" role="group" aria-label="选中文本操作">
-                  <span>选中：{selectedText}</span>
-                  <button
-                    type="button"
-                    onClick={() => handleLanguageSupport("explain")}
-                    disabled={isLanguageSupportLoading}
-                  >
-                    {isLanguageSupportLoading ? "解释中..." : "解释中文"}
-                  </button>
-                </div>
-              ) : null}
             </div>
 
             <div className="chat-composer" aria-label="对话输入区">
-              {completion?.status === "completed" && completion.completed_summary ? (
-                <section className="feedback-card feedback-card-guidance" aria-label="今日总结">
-                  <p className="feedback-card-label">练习已完成，但仍可继续对话</p>
-                  <p>{completion.completed_summary.summary_zh}</p>
-                  <p className="feedback-reason"><span>做得好的点：</span>{completion.completed_summary.strength_zh}</p>
-                  <p className="feedback-reason"><span>下次重点：</span>{completion.completed_summary.next_focus_zh}</p>
-                  {completion.completed_summary.reusable_sentences.length > 0 ? (
-                    <p className="feedback-example">{completion.completed_summary.reusable_sentences[0]}</p>
-                  ) : null}
-                </section>
-              ) : null}
               {showCompletionSuggestion ? (
                 <section className="feedback-card feedback-card-guidance" aria-label="结束建议">
                   <p className="feedback-card-label">今天可以收束了</p>
@@ -854,13 +1061,6 @@ export function PracticeRoom({ day, scenario, todayStrategy, profileId, onSelect
                   </div>
                 </section>
               ) : null}
-              {hints.length > 0 && (
-                <div className="hints-container">
-                  {hints.map((hint, idx) => (
-                    <span key={idx} className="hint-pill">{hint}</span>
-                  ))}
-                </div>
-              )}
               <textarea
                 aria-label="输入你的回答"
                 placeholder="可以录音转文字，也可以直接输入英文。确认后点击发送。"
@@ -875,16 +1075,25 @@ export function PracticeRoom({ day, scenario, todayStrategy, profileId, onSelect
                   }
                 }}
               />
-              <VoiceRecorder
-                disabled={isSubmitting}
-                onText={(text) => {
-                  setTypedText((current) => current.trim() ? current.trim() + " " + text : text);
-                }}
-                onVoiceMessage={(blob, durationMs) => void handleVoiceMessage(blob, durationMs)}
-              />
-              <PrimaryButton disabled={isSubmitting || !typedText.trim()} onClick={() => submitTurn(typedText)}>
-                {isSubmitting ? "发送中…" : "发送"}
-              </PrimaryButton>
+              <div className="composer-toolbar">
+                <VoiceRecorder
+                  disabled={isSubmitting}
+                  autoMode={phoneMode}
+                  autoRecordSignal={autoRecordSignal}
+                  onText={(text) => {
+                    if (phoneModeRef.current) {
+                      // 电话模式：识别即自动发送，无需手动点发送
+                      void submitTurn(text);
+                    } else {
+                      setTypedText((current) => current.trim() ? current.trim() + " " + text : text);
+                    }
+                  }}
+                  onVoiceMessage={(blob, durationMs) => void handleVoiceMessage(blob, durationMs)}
+                />
+                <PrimaryButton disabled={isSubmitting || !typedText.trim()} onClick={() => submitTurn(typedText)}>
+                  {isSubmitting ? "发送中…" : "发送"}
+                </PrimaryButton>
+              </div>
             </div>
           </section>
         </div>
@@ -895,12 +1104,11 @@ export function PracticeRoom({ day, scenario, todayStrategy, profileId, onSelect
             {feedbackTimeline.length > 0 ? (
               feedbackTimeline.map((item) => (
                 item.kind === "feedback" ? (
-                  <FeedbackCard item={item.item} key={item.id} />
+                  <FeedbackCard item={item.item} key={item.id} onLocate={locateTurn} />
                 ) : (
                   <div
                     className="language-support-dock"
                     key={item.id}
-                    ref={item.id === latestLanguageSupportItemId ? languageSupportRef : undefined}
                   >
                     <LanguageSupportCard result={item.result} />
                   </div>

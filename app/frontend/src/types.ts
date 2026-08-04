@@ -30,6 +30,8 @@ export type ConversationTurn = {
 
 export type InlineFeedback = {
   id: number;
+  /** 对应对话中的用户回合 id，用于「点击纠错定位到对话」 */
+  turn_id?: number | null;
   feedback_type: string;
   feedback_text: string;
   original_fragment?: string | null;
@@ -85,6 +87,9 @@ export type CompletionSummary = {
   next_focus_zh: string;
   reusable_sentences: string[];
   confidence: number;
+  /** 100 分制结算得分（依据本轮表达/单词错误扣分） */
+  score?: number;
+  score_detail_zh?: string;
 };
 
 export type SessionCompletion = {
@@ -233,4 +238,8 @@ export type SessionHistoryItem = {
   summary: string | null;
   overall_score: number | null;
   turn_count: number;
+  /** 本次练习得分（100 分制，旧数据可能没有） */
+  score?: number | null;
+  /** 难度等级（如 A2 / 自由） */
+  difficulty?: string | null;
 };

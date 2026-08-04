@@ -1,7 +1,7 @@
 import React from "react";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, expect, test, vi, type Mock } from "vitest";
-import { addFavorite, authGuest, authLogin, authRegister, clearAuth, completeSession, createOnboarding, deleteTurnPair, getCurrentLearningState, getFavorites, getGrowthSummary, getLearningPath, getProfiles, getPrompts, getScenarios, getSessionHistory, getTodayStrategy, hasAuth, playAudioFromUrl, playTTS, removeFavorite, runDueReviews, requestLanguageSupport, sendUserTurnStream, startScenarioSession, startSession, stopActiveAudio, storeAuth, transcribeAudio, translateText, updatePrompt } from "./api";
+import { addFavorite, authGuest, authLogin, authRegister, clearAuth, completeSession, createOnboarding, deleteTurnPair, getCurrentLearningState, getFavorites, getGrowthSummary, getLearningPath, getProfiles, getPrompts, getScenarios, getSelectedVoice, getSessionHistory, getTTSVoices, getTodayStrategy, hasAuth, playAudioFromUrl, playTTS, removeFavorite, runDueReviews, requestLanguageSupport, sendUserTurnStream, setSelectedVoice, startScenarioSession, startSession, stopActiveAudio, storeAuth, transcribeAudio, translateText, updatePrompt } from "./api";
 import App from "./App";
 
 vi.mock("./api", () => ({
@@ -34,6 +34,9 @@ vi.mock("./api", () => ({
   transcribeAudio: vi.fn(),
   updatePrompt: vi.fn(),
   runDueReviews: vi.fn(),
+  getTTSVoices: vi.fn(),
+  getSelectedVoice: vi.fn(),
+  setSelectedVoice: vi.fn(),
   requestLanguageSupport: vi.fn(),
   translateText: vi.fn(),
 }));
@@ -65,6 +68,14 @@ const mockCatalog = {
 beforeEach(() => {
   vi.resetAllMocks();
   localStorage.setItem("speakmate-token", "test-token");
+  localStorage.removeItem("speakmate-last-scenario");
+  localStorage.removeItem("speakmate-last-path");
+  localStorage.removeItem("speakmate-last-view");
+  localStorage.removeItem("speakmate-tts-muted");
+  localStorage.removeItem("speakmate-voice");
+  (getTTSVoices as Mock).mockResolvedValue({ voices: [], default_voice: "en-US-JennyNeural" });
+  (getSelectedVoice as Mock).mockReturnValue(null);
+  (setSelectedVoice as Mock).mockImplementation(() => undefined);
   (hasAuth as Mock).mockImplementation(() => Boolean(localStorage.getItem("speakmate-token")));
   (clearAuth as Mock).mockImplementation(() => {
     localStorage.removeItem("speakmate-token");
@@ -167,7 +178,9 @@ beforeEach(() => {
         strength_zh: "你能保持对话推进。",
         next_focus_zh: "下次继续补充时间和对象。",
         reusable_sentences: ["I'd like to book a room."],
-        confidence: 0.75
+        confidence: 0.75,
+        score: 95,
+        score_detail_zh: "本轮共发现 2 处表达或单词错误，扣除 5 分。"
       }
     }
   });
@@ -538,12 +551,15 @@ test("renders profile page with favorites, history and settings", async () => {
 
   expect(await screen.findByText("收藏的场景")).toBeTruthy();
   expect(screen.getByText("练习记录")).toBeTruthy();
-  expect(screen.getByText("双语展示")).toBeTruthy();
   expect(screen.queryByText("Advanced")).toBeNull();
   expect(screen.queryByText("Voice")).toBeNull();
   expect(screen.queryByText("Local Data")).toBeNull();
   expect(container.querySelector(".profile-card")).toBeTruthy();
   expect(container.querySelector(".profile-layout")).toBeTruthy();
+
+  // 设置已从「我的」独立出来，放在导航「我的」下面
+  fireEvent.click(screen.getByRole("button", { name: "设置" }));
+  expect(await screen.findByText("双语展示")).toBeTruthy();
 });
 
 test("profile page no longer exposes developer or learning-goal tools", async () => {
@@ -566,6 +582,50 @@ test("profile page no longer exposes developer or learning-goal tools", async ()
   expect(screen.queryByText("学习目标")).toBeNull();
   expect(screen.queryByText("新建学习目标")).toBeNull();
   expect(screen.queryByText("Advanced")).toBeNull();
+});
+
+test("profile page collapses long favorites/history and shows score with difficulty", async () => {
+  (getCurrentLearningState as Mock).mockResolvedValue(onboardingResult);
+  const favs = Array.from({ length: 5 }, (_, i) => ({
+    ...mockScenario,
+    id: `fav-${i}`,
+    title: `Favorite ${i}`,
+    difficulty: { level: i % 2 ? "B1" : "A2", vocabulary_range: "", sentence_complexity: "", target_functions: [] }
+  }));
+  (getFavorites as Mock).mockResolvedValue({ favorites: favs });
+  (getSessionHistory as Mock).mockResolvedValue({
+    sessions: [
+      {
+        id: 1, plan_day_id: null, scenario_id: "airport-check-in", profile_id: 1, day_index: 0,
+        topic: "Airport check-in", started_at: "2026-07-01T10:00:00", ended_at: "2026-07-01T10:05:00",
+        summary: "{}", overall_score: 4, turn_count: 6, score: 95, difficulty: "B1"
+      },
+      {
+        id: 2, plan_day_id: 1, scenario_id: null, profile_id: 1, day_index: 1,
+        topic: "Self-introduction", started_at: "2026-07-02T10:00:00", ended_at: null,
+        summary: null, overall_score: null, turn_count: 2, score: null, difficulty: "A2"
+      }
+    ]
+  });
+
+  render(<App />);
+  await screen.findByText("今日场景");
+  fireEvent.click(screen.getByRole("button", { name: "我的" }));
+
+  expect(await screen.findByText("收藏的场景")).toBeTruthy();
+  // 收藏默认折叠：只显示前 3 条，其余收起
+  expect(screen.getByText("Favorite 0")).toBeTruthy();
+  expect(screen.getByText("Favorite 2")).toBeTruthy();
+  expect(screen.queryByText("Favorite 3")).toBeNull();
+  fireEvent.click(screen.getByRole("button", { name: "展开全部（5）" }));
+  expect(screen.getByText("Favorite 3")).toBeTruthy();
+  fireEvent.click(screen.getByRole("button", { name: "收起" }));
+  expect(screen.queryByText("Favorite 3")).toBeNull();
+
+  // 练习记录：显示难度等级与本次得分
+  expect(screen.getByText(/难度 B1/)).toBeTruthy();
+  expect(screen.getByText(/得分 95\/100/)).toBeTruthy();
+  expect(screen.getByText(/难度 A2/)).toBeTruthy();
 });
 
 test("opens the learning plan from navigation after onboarding", async () => {
@@ -657,7 +717,7 @@ test("sends typed text and shows the assistant reply as text and plays audio", a
   
   // Streaming TTS 合并相邻句子后播放，减少句间停顿。
   await waitFor(() => {
-    expect(playTTS).toHaveBeenCalledWith("Great. Could you add your reservation name?");
+    expect(playTTS).toHaveBeenCalledWith("Great. Could you add your reservation name?", undefined);
   });
 });
 
@@ -686,7 +746,7 @@ test("renders structured correction feedback as a clear teaching card", async ()
   expect(screen.getByText("I'd like to book a non-smoking room for tonight.")).toBeTruthy();
 });
 
-test("shows one inline explain action and appends the result below feedback", async () => {
+test("no longer shows the inline explain popover on text selection", async () => {
   (getCurrentLearningState as Mock).mockResolvedValue(onboardingResult);
   (startSession as Mock).mockResolvedValue({
     ...startedSession,
@@ -709,113 +769,14 @@ test("shows one inline explain action and appends the result below feedback", as
 
   expect(await screen.findByText("I need your credit card expiry date.")).toBeTruthy();
   fireEvent.mouseUp(screen.getByLabelText("对话练习"));
-  expect(screen.queryByText("已选中：expiry")).toBeNull();
-  expect(screen.queryByRole("button", { name: "查词" })).toBeNull();
-  expect(screen.queryByRole("button", { name: "翻译" })).toBeNull();
-  expect(screen.getByText("选中：expiry")).toBeTruthy();
-
-  fireEvent.click(screen.getByRole("button", { name: "解释中文" }));
-
-  await waitFor(() => {
-    expect(requestLanguageSupport).toHaveBeenCalledWith({
-      mode: "explain",
-      text: "expiry",
-      context: expect.stringContaining("credit card expiry")
-    });
-  });
-  expect(await screen.findByText("有效期，到期日")).toBeTruthy();
-  expect(screen.getByText("What is the expiry date on your card?")).toBeTruthy();
-  expect(screen.queryByText("选中：expiry")).toBeNull();
+  // 内置选中解释插件已移除：选中文本不再弹出「解释中文」
+  expect(screen.queryByText(/选中：/)).toBeNull();
   expect(screen.queryByRole("button", { name: "解释中文" })).toBeNull();
-  expect(selection.removeAllRanges).toHaveBeenCalled();
-  const feedbackSidebar = screen.getByLabelText("实时纠错");
-  expect(feedbackSidebar.querySelector(".language-support-dock")).toBeTruthy();
-  expect(Element.prototype.scrollIntoView).toHaveBeenCalled();
+  expect(requestLanguageSupport).not.toHaveBeenCalled();
 });
 
-test("keeps language support in chronological feedback order after later feedback", async () => {
-  (getCurrentLearningState as Mock).mockResolvedValue(onboardingResult);
-  (startSession as Mock).mockResolvedValue({
-    ...startedSession,
-    turns: [{
-      id: 1,
-      session_id: 1,
-      turn_index: 1,
-      speaker: "assistant",
-      text: "I need your itinerary."
-    }],
-    feedback_history: [{
-      id: 20,
-      feedback_type: "guidance",
-      feedback_text: "先说明你的旅游计划。",
-      reason_zh: "对方需要知道你的行程。",
-      example_sentence: "I plan to visit the city center tomorrow."
-    }]
-  });
-  (requestLanguageSupport as Mock).mockResolvedValue({
-    mode: "explain",
-    text: "itinerary",
-    meaning_zh: "行程；旅行计划",
-    scene_note_zh: "在旅游场景中，itinerary 指你计划的游览路线或日程安排。",
-    example_sentence: "You can choose your own itinerary for the private tour."
-  });
-  (sendUserTurnStream as Mock).mockImplementation(async (_sessionId: number, _text: string, onTextChunk: (chunk: string) => void) => {
-    onTextChunk("Could you tell me the maximum group size?");
-    return {
-      user_turn: {
-        id: 21,
-        session_id: 1,
-        turn_index: 2,
-        speaker: "user",
-        text: "Can I have a discount for group of 6?"
-      },
-      assistant_turn: {
-        id: 22,
-        session_id: 1,
-        turn_index: 3,
-        speaker: "assistant",
-        text: "Sure, I can explain our group discount."
-      },
-      inline_feedback: [{
-        id: 23,
-        feedback_type: "guidance",
-        feedback_text: "目标表达中有折扣问题，可顺势使用。",
-        reason_zh: "下一步可以自然询问人数折扣。",
-        example_sentence: "Could you tell me the maximum group size?"
-      }],
-      hints: []
-    };
-  });
-  const selection = {
-    toString: () => "itinerary",
-    rangeCount: 1,
-    removeAllRanges: vi.fn()
-  };
-  vi.spyOn(window, "getSelection").mockReturnValue(selection as unknown as Selection);
-
-  render(<App />);
-
-  expect(await screen.findByText("I need your itinerary.")).toBeTruthy();
-  fireEvent.mouseUp(screen.getByLabelText("对话练习"));
-  fireEvent.click(screen.getByRole("button", { name: "解释中文" }));
-  const languageExample = await screen.findByText("You can choose your own itinerary for the private tour.");
-
-  const response = screen.getByLabelText("输入你的回答");
-  fireEvent.change(response, { target: { value: "Can I have a discount for group of 6?" } });
-  fireEvent.click(screen.getByRole("button", { name: "发送" }));
-
-  await screen.findByText("Could you tell me the maximum group size?");
-  const feedbackList = screen.getByLabelText("实时纠错").querySelector(".feedback-list");
-  const directItems = Array.from(feedbackList?.children || []).filter((item) => item.textContent?.trim());
-  const languageIndex = directItems.findIndex((item) => item.textContent?.includes("行程；旅行计划"));
-  const laterFeedbackIndex = directItems.findIndex((item) => item.textContent?.includes("Could you tell me the maximum group size?"));
-  expect(languageExample).toBeTruthy();
-  expect(languageIndex).toBeGreaterThan(-1);
-  expect(laterFeedbackIndex).toBeGreaterThan(languageIndex);
-});
 
 test("lets the user manually complete today's practice and shows summary", async () => {
-  vi.spyOn(window, "confirm").mockReturnValue(true);
   (getCurrentLearningState as Mock).mockResolvedValue(onboardingResult);
   (startSession as Mock).mockResolvedValue({
     ...startedSession,
@@ -840,6 +801,10 @@ test("lets the user manually complete today's practice and shows summary", async
   expect(screen.getAllByText("今日已完成").length).toBeGreaterThan(0);
   expect(screen.getByText("今天你完成了酒店入住练习。")).toBeTruthy();
   expect(screen.getByText("I'd like to book a room.")).toBeTruthy();
+  // 总结卡片展示 100 分制得分与扣分说明
+  expect(screen.getByText("95 / 100")).toBeTruthy();
+  expect(screen.getByText("本次练习得分：")).toBeTruthy();
+  expect(screen.getByText("本轮共发现 2 处表达或单词错误，扣除 5 分。")).toBeTruthy();
   expect(completeSession).toHaveBeenCalledWith(1, "manual");
 });
 
@@ -924,7 +889,7 @@ test("replays an assistant message from its speaker button", async () => {
   fireEvent.click(screen.getByRole("button", { name: "播放教练语音" }));
 
   await waitFor(() => {
-    expect(playTTS).toHaveBeenCalledWith("Welcome to practice.");
+    expect(playTTS).toHaveBeenCalledWith("Welcome to practice.", undefined);
   });
 });
 
@@ -1033,4 +998,207 @@ test("logs out from the sidebar and returns to login", async () => {
 
   expect(clearAuth).toHaveBeenCalled();
   expect(await screen.findByRole("tab", { name: "登录" })).toBeTruthy();
+});
+
+test("hides the today picker cards after selecting a scenario", async () => {
+  (getCurrentLearningState as Mock).mockResolvedValue(onboardingResult);
+  (startScenarioSession as Mock).mockResolvedValue({
+    session: { id: 2, day_index: 0, topic: "Airport check-in" },
+    turns: [{ id: 1, session_id: 2, turn_index: 1, speaker: "assistant", text: "Let's practice: Airport check-in." }],
+    plan_day: null,
+    practice_brief: { title: "Airport check-in", target_expressions: [] }
+  });
+
+  render(<App />);
+
+  await screen.findByText("今日场景");
+  // 选择场景前：显示「今日练习」与场景卡片
+  expect(screen.getByText("今日练习")).toBeTruthy();
+  fireEvent.click(screen.getByRole("button", { name: /Airport check-in/ }));
+
+  // 选择场景后：今日练习标题与六卡片选择器隐藏，进入该场景对话
+  expect(await screen.findByText("当前场景")).toBeTruthy();
+  expect(screen.queryByText("今日练习")).toBeNull();
+  expect(startScenarioSession).toHaveBeenCalledWith("airport-check-in", onboardingResult.profile.id);
+});
+
+test("resumes the last scenario conversation after logout and login", async () => {
+  (getCurrentLearningState as Mock).mockResolvedValue(onboardingResult);
+  (startScenarioSession as Mock).mockResolvedValue({
+    session: { id: 2, day_index: 0, topic: "Airport check-in" },
+    turns: [{ id: 1, session_id: 2, turn_index: 1, speaker: "assistant", text: "Let's practice: Airport check-in." }],
+    plan_day: null,
+    practice_brief: { title: "Airport check-in", target_expressions: [] }
+  });
+
+  render(<App />);
+
+  await screen.findByText("今日场景");
+  fireEvent.click(screen.getByRole("button", { name: /Airport check-in/ }));
+  await screen.findByText("当前场景");
+
+  // 登出
+  fireEvent.click(screen.getByRole("button", { name: "登出" }));
+  await screen.findByRole("tab", { name: "登录" });
+
+  // 重新登录同一账号
+  fireEvent.change(screen.getByLabelText("用户名 / 手机号"), { target: { value: "13800138000" } });
+  fireEvent.change(screen.getByLabelText("密码"), { target: { value: "secret123" } });
+  fireEvent.click(screen.getByRole("button", { name: "登录" }));
+
+  // 恢复上次的场景对话界面，而不是回到刚注册的样子
+  expect(await screen.findByText("当前场景")).toBeTruthy();
+  expect(startScenarioSession).toHaveBeenCalledWith("airport-check-in", onboardingResult.profile.id);
+});
+
+test("starts the first card in today view when a learning path is chosen", async () => {
+  (getCurrentLearningState as Mock).mockResolvedValue(onboardingResult);
+  (getScenarios as Mock).mockResolvedValue(mockCatalog);
+  (getLearningPath as Mock).mockResolvedValue({
+    tier: "beginner",
+    level: "A1",
+    levels: ["A1", "A2"],
+    path: [mockScenario]
+  });
+  (startScenarioSession as Mock).mockResolvedValue({
+    session: { id: 2, day_index: 0, topic: "Airport check-in" },
+    turns: [{ id: 1, session_id: 2, turn_index: 1, speaker: "assistant", text: "Let's practice: Airport check-in." }],
+    plan_day: null,
+    practice_brief: { title: "Airport check-in", target_expressions: [] }
+  });
+
+  render(<App />);
+  await screen.findByText("今日场景");
+  fireEvent.click(screen.getByRole("button", { name: "场景" }));
+  await screen.findByText("选择练习场景");
+
+  // 选择一条路线（小白）
+  fireEvent.click(screen.getByRole("button", { name: /小白/ }));
+
+  // 自动跳转今日板块并开始第一张卡片练习（先展示该卡片的课程简报）
+  await waitFor(() => {
+    expect(startScenarioSession).toHaveBeenCalledWith("airport-check-in", onboardingResult.profile.id);
+  });
+  expect(await screen.findByText("开口前先看一眼")).toBeTruthy();
+});
+
+test("offers a free-talk entry in today view", async () => {
+  (getCurrentLearningState as Mock).mockResolvedValue(onboardingResult);
+  (startScenarioSession as Mock).mockResolvedValue({
+    session: { id: 3, day_index: 0, topic: "自由对话" },
+    turns: [{ id: 1, session_id: 3, turn_index: 1, speaker: "assistant", text: "Hi! Let's have a free chat." }],
+    plan_day: null,
+    practice_brief: { title: "自由对话", npc_role: "英语口语陪练教练", target_expressions: [] }
+  });
+
+  render(<App />);
+
+  await screen.findByText("今日场景");
+  fireEvent.click(screen.getByRole("button", { name: "自由对话" }));
+
+  await waitFor(() => {
+    expect(startScenarioSession).toHaveBeenCalledWith("free_talk", onboardingResult.profile.id);
+  });
+  expect(await screen.findByText("Hi! Let's have a free chat.")).toBeTruthy();
+});
+
+test("refetches scenarios with the selected difficulty tier", async () => {
+  (getCurrentLearningState as Mock).mockResolvedValue(onboardingResult);
+  render(<App />);
+  await screen.findByText("今日场景");
+  fireEvent.click(screen.getByRole("button", { name: "场景" }));
+  await screen.findByText("选择练习场景");
+
+  // 切换难度分级下拉：应携带 tier 参数重新请求后端，而非本地错误过滤
+  fireEvent.change(screen.getByLabelText("难度分级"), { target: { value: "advanced" } });
+  await waitFor(() => {
+    expect(getScenarios).toHaveBeenCalledWith(
+      onboardingResult.profile.id,
+      expect.objectContaining({ tier: "advanced" })
+    );
+  });
+});
+
+test("locates the conversation turn when a feedback card is clicked", async () => {
+  (getCurrentLearningState as Mock).mockResolvedValue(onboardingResult);
+  (startSession as Mock).mockResolvedValue({
+    ...startedSession,
+    turns: [
+      { id: 1, session_id: 1, turn_index: 1, speaker: "assistant", text: "Today we will practice your self-introduction." },
+      { id: 2, session_id: 1, turn_index: 2, speaker: "user", text: "I want to book a room." },
+      { id: 3, session_id: 1, turn_index: 3, speaker: "assistant", text: "Great, keep going." }
+    ],
+    feedback_history: [{
+      id: 10,
+      turn_id: 2,
+      feedback_type: "correction",
+      feedback_text: "I need -> I'd like to book: 更自然。",
+      original_fragment: "I need",
+      better_expression: "I'd like to book",
+      reason_zh: "更自然。",
+      example_sentence: "I'd like to book a non-smoking room."
+    }]
+  });
+
+  render(<App />);
+
+  // 纠错卡片可点击定位到对应对话回合
+  const card = await screen.findByText("更自然。");
+  fireEvent.click(card);
+
+  const targetRow = document.querySelector('[data-turn-id="2"]');
+  expect(targetRow).toBeTruthy();
+  expect(targetRow?.classList.contains("message-row-highlight")).toBe(true);
+  expect(Element.prototype.scrollIntoView).toHaveBeenCalled();
+});
+
+test("enters and exits phone mode", async () => {
+  (getCurrentLearningState as Mock).mockResolvedValue(onboardingResult);
+  (startSession as Mock).mockResolvedValue(startedSession);
+
+  render(<App />);
+
+  await screen.findByText("今日场景");
+  fireEvent.click(screen.getByRole("button", { name: "开启电话模式" }));
+
+  // 进入电话模式：显示通话状态条，按钮变为挂断
+  expect(await screen.findByLabelText("电话模式状态")).toBeTruthy();
+  expect(screen.getByText(/电话模式 · 正在聆听/)).toBeTruthy();
+
+  // 挂断：状态条消失
+  fireEvent.click(screen.getByRole("button", { name: "挂断电话模式" }));
+  expect(screen.queryByLabelText("电话模式状态")).toBeNull();
+  expect(screen.getByRole("button", { name: "开启电话模式" })).toBeTruthy();
+});
+
+test("mutes auto-play of AI replies with one click", async () => {
+  (getCurrentLearningState as Mock).mockResolvedValue(onboardingResult);
+  (startSession as Mock).mockResolvedValue(startedSession);
+  (sendUserTurnStream as Mock).mockImplementation(async (_sessionId: number, _text: string, onTextChunk: (chunk: string) => void) => {
+    onTextChunk("Great. Could you add your reservation name?");
+    return sentTurnResult;
+  });
+  (playTTS as Mock).mockResolvedValue(undefined);
+
+  render(<App />);
+
+  // 默认自动朗读开启
+  expect(await screen.findByRole("button", { name: "AI 回复自动朗读中，点击静音" })).toBeTruthy();
+
+  // 一键静音
+  fireEvent.click(screen.getByRole("button", { name: "AI 回复自动朗读中，点击静音" }));
+  expect(screen.getByRole("button", { name: "语音已静音，点击开启自动朗读" })).toBeTruthy();
+
+  const response = await screen.findByLabelText("输入你的回答");
+  fireEvent.change(response, { target: { value: "I want to check in, please." } });
+  fireEvent.click(screen.getByRole("button", { name: "发送" }));
+
+  await waitFor(() => {
+    expect(sendUserTurnStream).toHaveBeenCalledTimes(1);
+  });
+  expect(screen.getByText("Great. Could you add your reservation name?")).toBeTruthy();
+
+  // 静音后 AI 回复不再自动朗读
+  await new Promise((resolve) => setTimeout(resolve, 120));
+  expect(playTTS).not.toHaveBeenCalled();
 });

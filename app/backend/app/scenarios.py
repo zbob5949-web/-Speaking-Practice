@@ -136,6 +136,153 @@ SCENARIOS: tuple[Scenario, ...] = (
 SCENARIOS_INDEX: dict[str, int] = {scenario.id: index for index, scenario in enumerate(SCENARIOS)}
 
 
+# 各场景「可直接套用的表达」：点击场景卡片进入课程简报时展示，
+# 由 _scenario_brief 填充到 practice brief 的 target_expressions（不依赖 LLM，保证可靠）。
+SCENARIO_EXPRESSIONS: dict[str, list[dict[str, str]]] = {
+    "airport-check-in": [
+        {"expression": "I'd like to check in for my flight, please.", "meaning_zh": "我想办理值机。", "example": "I'd like to check in for my flight to Shanghai, please.", "when_to_use": "走到柜台开口的第一句话"},
+        {"expression": "Could you please help me with...?", "meaning_zh": "你能帮我……吗？", "example": "Could you please help me with my baggage?", "when_to_use": "需要协助时礼貌请求"},
+        {"expression": "Is there a window seat available?", "meaning_zh": "还有靠窗的座位吗？", "example": "Is there a window seat available on this flight?", "when_to_use": "选座时询问"},
+        {"expression": "How much baggage is included in my ticket?", "meaning_zh": "我的机票包含多少行李额？", "example": "How much baggage is included in my ticket?", "when_to_use": "确认行李额度"},
+        {"expression": "What time does boarding start?", "meaning_zh": "什么时候开始登机？", "example": "What time does boarding start for this flight?", "when_to_use": "确认登机时间"},
+    ],
+    "hotel-check-in": [
+        {"expression": "I have a reservation under the name...", "meaning_zh": "我用……的名字预订了房间。", "example": "I have a reservation under the name Wang.", "when_to_use": "办理入住时报预订信息"},
+        {"expression": "My flight was delayed, so I arrived late.", "meaning_zh": "我的航班延误了，所以来晚了。", "example": "My flight was delayed, so I arrived late tonight.", "when_to_use": "解释晚到原因"},
+        {"expression": "Could I get a room with a view, please?", "meaning_zh": "可以给我一间景观房吗？", "example": "Could I get a room with a view, please?", "when_to_use": "提出房间偏好"},
+        {"expression": "What time is breakfast served?", "meaning_zh": "早餐几点供应？", "example": "What time is breakfast served in the morning?", "when_to_use": "询问早餐时间"},
+        {"expression": "There's a problem with my room. The... doesn't work.", "meaning_zh": "我的房间有问题，……坏了。", "example": "There's a problem with my room. The air conditioner doesn't work.", "when_to_use": "反馈房间问题"},
+    ],
+    "restaurant-order": [
+        {"expression": "Could I see the menu, please?", "meaning_zh": "请给我看一下菜单。", "example": "Could I see the menu, please?", "when_to_use": "入座后点餐前"},
+        {"expression": "I'd like to order...", "meaning_zh": "我想点……", "example": "I'd like to order the grilled chicken, please.", "when_to_use": "点餐时说明要什么"},
+        {"expression": "Does this dish contain any...?", "meaning_zh": "这道菜里含有……吗？", "example": "Does this dish contain any nuts or peanuts?", "when_to_use": "确认食材（过敏/忌口）"},
+        {"expression": "Could you recommend something?", "meaning_zh": "你能推荐一下吗？", "example": "Could you recommend something popular here?", "when_to_use": "不知道点什么时请服务员推荐"},
+        {"expression": "Could we have the bill, please?", "meaning_zh": "请给我们结账。", "example": "Could we have the bill, please?", "when_to_use": "用餐结束要求买单"},
+    ],
+    "job-interview": [
+        {"expression": "Let me give you an example from my last job.", "meaning_zh": "让我举一个上份工作中的例子。", "example": "Let me give you an example from my last job.", "when_to_use": "用实例支撑回答时"},
+        {"expression": "My greatest strength is...", "meaning_zh": "我最大的优势是……", "example": "My greatest strength is staying calm under pressure.", "when_to_use": "被问到优势时"},
+        {"expression": "I handled this by...", "meaning_zh": "我是通过……处理这件事的。", "example": "I handled this by breaking the task into smaller steps.", "when_to_use": "讲述处理问题的过程"},
+        {"expression": "What I learned from that experience was...", "meaning_zh": "我从那段经历中学到的是……", "example": "What I learned from that experience was to communicate early.", "when_to_use": "总结反思时"},
+        {"expression": "Could you tell me more about the team?", "meaning_zh": "能多介绍一下团队吗？", "example": "Could you tell me more about the team I'd be working with?", "when_to_use": "面试最后主动提问"},
+    ],
+    "doctor-visit": [
+        {"expression": "I've been feeling... for a few days.", "meaning_zh": "我这几天一直觉得……", "example": "I've been feeling tired and dizzy for a few days.", "when_to_use": "描述症状开始时间"},
+        {"expression": "The pain is in my...", "meaning_zh": "疼痛在……部位。", "example": "The pain is in my lower back.", "when_to_use": "指明疼痛位置"},
+        {"expression": "It started when...", "meaning_zh": "症状是从……开始的。", "example": "It started when I ran a marathon last weekend.", "when_to_use": "说明诱因"},
+        {"expression": "On a scale of one to ten, it's about a...", "meaning_zh": "如果疼痛分 1 到 10 级，大概是……级。", "example": "On a scale of one to ten, it's about a six.", "when_to_use": "量化疼痛程度"},
+        {"expression": "How often should I take this medicine?", "meaning_zh": "这药应该多久吃一次？", "example": "How often should I take this medicine?", "when_to_use": "确认服药方法"},
+    ],
+    "shopping-return": [
+        {"expression": "I'd like to return this item.", "meaning_zh": "我想退掉这件商品。", "example": "I'd like to return this item. It doesn't fit.", "when_to_use": "开门见山说明来意"},
+        {"expression": "I bought this here yesterday.", "meaning_zh": "这是我昨天在这里买的。", "example": "I bought this here yesterday and I have the receipt.", "when_to_use": "出示购买凭证"},
+        {"expression": "There's a problem with it. It's...", "meaning_zh": "它有问题，……", "example": "There's a problem with it. It's damaged at the seam.", "when_to_use": "说明商品问题"},
+        {"expression": "Could I exchange it for a different size?", "meaning_zh": "可以换一个尺码吗？", "example": "Could I exchange it for a different size?", "when_to_use": "提出换货"},
+        {"expression": "What's your return policy?", "meaning_zh": "你们的退换货政策是什么？", "example": "What's your return policy for sale items?", "when_to_use": "确认退换政策"},
+    ],
+}
+
+
+# 各场景开场白（按难度三档）：
+# 18 张卡片 = 6 场景 × 3 档，每张开场白内容与复杂度都不同，
+# 避免所有卡片都以同一条模板开场、对话雷同。
+SCENARIO_OPENERS: dict[str, dict[str, str]] = {
+    "airport-check-in": {
+        "beginner": (
+            "Welcome to check-in. May I see your passport and flight ticket, please? "
+            "What is your name?"
+        ),
+        "intermediate": (
+            "Good afternoon! I see you have an international flight today. "
+            "Could you show me your passport and ticket? "
+            "And would you prefer a window seat or an aisle seat this time?"
+        ),
+        "advanced": (
+            "Good afternoon, and welcome! Before we proceed, could you hand me your passport and booking reference? "
+            "I also noticed your itinerary has a tight connection in Singapore — "
+            "would you like me to check whether we can move you to an earlier flight, or would you prefer to keep this one?"
+        ),
+    },
+    "hotel-check-in": {
+        "beginner": (
+            "Hello! Welcome to our hotel. Do you have a reservation? What is your name, please?"
+        ),
+        "intermediate": (
+            "Good evening, and welcome to the Grand Hotel! "
+            "May I have your name to look up your reservation? "
+            "And could you tell me what time you arrived today?"
+        ),
+        "advanced": (
+            "Good evening, and welcome to the Grand Hotel — I hope your journey went smoothly. "
+            "May I take your name to pull up your reservation? "
+            "I see we received a note about a late arrival; was there any delay with your flight, "
+            "and is there anything about the room we can prepare for you in advance?"
+        ),
+    },
+    "restaurant-order": {
+        "beginner": (
+            "Hello! Welcome to our restaurant. Here is the menu. "
+            "What would you like to eat or drink today?"
+        ),
+        "intermediate": (
+            "Good evening! Let me get you a menu. "
+            "Our grilled salmon and the mushroom risotto are quite popular tonight. "
+            "Do you have any preferences — or any allergies I should know about?"
+        ),
+        "advanced": (
+            "Good evening, and welcome! Tonight our chef is featuring a slow-braised short rib and a "
+            "seasonal truffle pasta. If you tell me what you're in the mood for — light, rich, spicy — "
+            "I can point you to the best options, and I'd also like to check whether there are any "
+            "allergies or dietary restrictions I should keep in mind."
+        ),
+    },
+    "job-interview": {
+        "beginner": (
+            "Hello. Please sit down. Tell me about yourself. What do you do now?"
+        ),
+        "intermediate": (
+            "Nice to meet you. Let's start with a quick overview — "
+            "could you walk me through your current role and one project you're proud of?"
+        ),
+        "advanced": (
+            "Great to meet you. Before we dive into specifics, I'd like to hear how you frame your own career — "
+            "tell me about the most challenging decision you've made in your current role, "
+            "what made it difficult, and what you learned from the outcome."
+        ),
+    },
+    "doctor-visit": {
+        "beginner": (
+            "Hello. Please sit down. What is wrong? Where do you feel pain?"
+        ),
+        "intermediate": (
+            "Hello, I'm Dr. Lee. So what brings you in today? "
+            "Can you tell me where exactly you're feeling discomfort and how long it's been going on?"
+        ),
+        "advanced": (
+            "Good morning, I'm Dr. Lee. Let's start from the beginning — "
+            "when did you first notice these symptoms, and have they been getting steadily worse? "
+            "I'd also like to know whether anything you've tried so far has given you any relief at all."
+        ),
+    },
+    "shopping-return": {
+        "beginner": (
+            "Hello! Welcome. Can I help you? Do you want to return something?"
+        ),
+        "intermediate": (
+            "Hi there, how can I help you today? "
+            "If you'd like to return or exchange something, do you have the receipt with you?"
+        ),
+        "advanced": (
+            "Hello, welcome in! What can we do for you today? "
+            "If you're here about an item, I'd be happy to look into it — "
+            "do you happen to have the receipt or your order confirmation handy, "
+            "and could you tell me what issue you've run into?"
+        ),
+    },
+}
+
+
 LEVEL_ORDER = {"A1": 0, "A2": 1, "B1": 2, "B2": 3, "C1": 4}
 
 

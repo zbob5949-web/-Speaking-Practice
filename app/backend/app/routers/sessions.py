@@ -39,9 +39,9 @@ def delete_turn_pair(session_id: int, user_turn_id: int) -> dict[str, object]:
 
 @router.get("/api/sessions")
 def list_sessions(profile_id: int | None = None, limit: int = 60) -> dict[str, object]:
-    """历史对话场景列表：包含 topic、场景、开始/结束时间、完成状态与回合数。"""
+    """历史对话场景列表：包含 topic、场景、开始/结束时间、完成状态、回合数与本次得分/难度。"""
     repo = deps.get_repository()
-    sessions = repo.get_sessions(profile_id=profile_id, limit=limit)
+    sessions = sessions_service.enrich_sessions(repo, repo.get_sessions(profile_id=profile_id, limit=limit))
     return {"sessions": sessions}
 
 

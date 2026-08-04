@@ -18,6 +18,16 @@ const CATEGORY_TINTS: Record<string, string> = {
   "购物": "linear-gradient(135deg, #fdf3d0 0%, #fff8e8 100%)",
 };
 
+/** 场景卡片配图:按场景 id 映射到 public/scenarios/ 下的图片 */
+export const SCENARIO_IMAGES: Record<string, string> = {
+  "airport-check-in": "/scenarios/机场.webp",
+  "hotel-check-in": "/scenarios/酒店.webp",
+  "restaurant-order": "/scenarios/餐厅.webp",
+  "job-interview": "/scenarios/面试卡通图.webp",
+  "doctor-visit": "/scenarios/门诊.jpg",
+  "shopping-return": "/scenarios/购物.webp",
+};
+
 function scenarioLevelRange(scenario: Scenario): string {
   const levels = (scenario.bands ?? []).map((band) => band.level).filter(Boolean);
   if (levels.length === 0) return scenario.difficulty?.level ?? "";
@@ -64,7 +74,11 @@ export function ScenarioPicker({ profileId, activeScenarioId, onSelect, faded = 
             <span
               className="scenario-card-media"
               aria-hidden="true"
-              style={{ background: CATEGORY_TINTS[scenario.category] ?? undefined }}
+              style={{
+                backgroundImage: SCENARIO_IMAGES[scenario.id]
+                  ? `url("${SCENARIO_IMAGES[scenario.id]}")`
+                  : CATEGORY_TINTS[scenario.category] ?? undefined,
+              }}
             />
             <span className="scenario-card-index">{scenario.category} · {scenarioLevelRange(scenario)}</span>
             <strong>{scenario.title}</strong>
