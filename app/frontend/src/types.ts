@@ -41,6 +41,35 @@ export type InlineFeedback = {
   severity?: string | null;
 };
 
+/** 单条错误报告条目（后端 error_aggregation 聚合后的 error 对象） */
+export type ErrorReportItem = {
+  error_type?: string | null;
+  rule_id?: string | null;
+  feedback_type?: string | null;
+  original_fragment?: string | null;
+  better_expression?: string | null;
+  feedback_text?: string | null;
+  reason_zh?: string | null;
+  example_sentence?: string | null;
+  severity?: "high" | "medium" | "low" | string | null;
+  /** 同一错误出现的次数 */
+  frequency?: number;
+  examples?: string[];
+  source?: string | null;
+  source_url?: string | null;
+};
+
+/** 一轮对话结束后的错误报告（该轮或整个会话的聚合） */
+export type ErrorReport = {
+  total_errors: number;
+  unique_errors: number;
+  errors: ErrorReportItem[];
+  by_error_type: Record<string, number>;
+  has_errors: boolean;
+  /** 对应哪一轮用户回合（会话级报告可能没有） */
+  turn_id?: number | null;
+};
+
 export type TargetExpression = string | {
   expression: string;
   meaning_zh?: string;

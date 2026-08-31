@@ -1,5 +1,5 @@
 """会话路由。"""
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException
 from fastapi.responses import StreamingResponse
 
 from app import dependencies as deps
@@ -26,6 +26,11 @@ def add_user_turn(request: UserTurnRequest) -> dict[str, object]:
 
 @router.post("/api/sessions/turn/stream")
 def add_user_turn_stream(request: UserTurnRequest) -> StreamingResponse:
+    # 路由层先校验会话存在：会话被删除/失效时直接返回 404，
+    # 避免在 SSE 生成器内部抛异常导致响应头已发出、流中断成空流
+    repo = deps.get_repository()
+    if repo.get_session(request.session_id) is None:
+        raise HTTPException(status_code=404, detail="Session not found")
     return StreamingResponse(
         sessions_service.stream_user_turn(request),
         media_type="text/event-stream",

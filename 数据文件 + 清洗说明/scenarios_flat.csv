@@ -1,0 +1,31 @@
+﻿scenario_id,category,title,difficulty_level,vocabulary_range,sentence_complexity,target_functions
+airport-check-in,出行,Airport check-in,A1,80-150 high-frequency travel words,Short present-tense requests,greet;state destination;ask for help
+airport-check-in,出行,Airport check-in,A2,150-300 travel and time words,Because/when clauses and polite can/could requests,give booking details;ask about baggage;confirm time
+airport-check-in,出行,Airport check-in,B1,300-600 travel-service words,Past explanations and connected follow-up questions,explain a problem;negotiate a seat;confirm a solution
+airport-check-in,出行,Airport check-in,B2,600-900 service and policy words,"Conditionals, modifiers, and precise clarification",compare options;challenge a restriction;summarize the agreement
+airport-check-in,出行,Airport check-in,C1,900+ nuanced service vocabulary,Spontaneous multi-clause negotiation,handle an exception;justify a request;paraphrase policy
+hotel-check-in,出行,Hotel check-in,A1,80-150 hotel and personal words,Simple be/have sentences,give your name;show a booking;ask for a key
+hotel-check-in,出行,Hotel check-in,A2,150-300 hotel and time words,Past simple reasons plus polite requests,explain arrival;ask about breakfast;confirm checkout
+hotel-check-in,出行,Hotel check-in,B1,300-600 accommodation words,Relative clauses and cause/effect connectors,report a booking issue;request a change;confirm alternatives
+hotel-check-in,出行,Hotel check-in,B2,600-900 hospitality and policy words,Conditionals and nuanced complaints,negotiate compensation;compare room options;justify a preference
+hotel-check-in,出行,Hotel check-in,C1,900+ formal hospitality vocabulary,Flexible register and complex negotiation,resolve a dispute;reframe a policy;reach a compromise
+restaurant-order,餐饮,Restaurant order,A1,80-150 food words,Short requests with like/want,choose a dish;ask for water;pay
+restaurant-order,餐饮,Restaurant order,A2,150-300 food and preference words,Countable nouns and simple questions,ask about ingredients;state a preference;request the bill
+restaurant-order,餐饮,Restaurant order,B1,300-600 menu and dietary words,Reason clauses and comparatives,explain a restriction;choose an alternative;give feedback
+restaurant-order,餐饮,Restaurant order,B2,600-900 culinary and service words,"Concessions, conditionals, and precise qualifiers",customize an order;raise a problem;propose a solution
+restaurant-order,餐饮,Restaurant order,C1,900+ nuanced food and service vocabulary,Persuasive and tactful discourse,discuss provenance;resolve a service failure;recommend an option
+job-interview,职场,Job interview,A1,100-200 work and personal words,Simple past and present sentences,introduce yourself;state a skill;answer a simple question
+job-interview,职场,Job interview,A2,200-400 common workplace words,Past events with first/then/because,describe a task;state a strength;ask about work
+job-interview,职场,Job interview,B1,400-700 role-specific words,STAR-style narratives and contrasting clauses,give evidence;explain a challenge;ask a follow-up
+job-interview,职场,Job interview,B2,700-1100 professional vocabulary,"Conditionals, passive voice, and nuanced claims",defend a decision;compare approaches;discuss trade-offs
+job-interview,职场,Job interview,C1,1100+ domain and strategic vocabulary,Structured persuasive answers with register control,lead a case discussion;challenge an assumption;summarize impact
+doctor-visit,医疗,Doctor visit,A1,80-160 body and symptom words,Simple have/be sentences,name a symptom;say when it started;ask for help
+doctor-visit,医疗,Doctor visit,A2,160-320 health and time words,"Since/for, frequency, and simple comparisons",describe duration;rate severity;confirm medicine
+doctor-visit,医疗,Doctor visit,B1,320-650 health-service words,Sequenced history and conditional advice,explain change;report a response;ask about warning signs
+doctor-visit,医疗,Doctor visit,B2,650-1000 clinical and lifestyle words,Precise qualifiers and reported information,compare symptoms;clarify risk;summarize instructions
+doctor-visit,医疗,Doctor visit,C1,1000+ nuanced health vocabulary,"Tactful, precise explanation of uncertainty",question a plan;weigh options;negotiate follow-up
+shopping-return,购物,Shopping and return,A1,80-160 shopping words,Short statements and can/can't,name an item;state a problem;ask the price
+shopping-return,购物,Shopping and return,A2,160-320 shopping and payment words,Past purchase details and polite questions,show a receipt;ask for an exchange;confirm a size
+shopping-return,购物,Shopping and return,B1,320-650 product and policy words,Cause/effect and comparison,describe a defect;explain preference;ask about policy
+shopping-return,购物,Shopping and return,B2,650-1000 consumer-service words,Conditionals and tactful disagreement,challenge a decision;propose a remedy;summarize terms
+shopping-return,购物,Shopping and return,C1,1000+ formal consumer vocabulary,Persuasive complaint with concessions,escalate a case;reference evidence;reach a fair settlement

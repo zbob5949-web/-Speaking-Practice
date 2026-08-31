@@ -1,6 +1,6 @@
 ﻿import { useEffect, useRef, useState } from "react";
 import { clearSessionHistory, completeSession, deleteTurnPair, getSelectedVoice, playAudioFromUrl, sendUserTurnStream, startScenarioSession, startSession, playTTS, stopActiveAudio, transcribeAudio, translateText } from "../api";
-import type { ConversationTurn, InlineFeedback, LanguageSupportResult, PlanDay, PracticeBrief, PracticeSession, Scenario, SessionCompletion, TargetExpression, TodayStrategy } from "../types";
+import type { ConversationTurn, ErrorReport, ErrorReportItem, InlineFeedback, LanguageSupportResult, PlanDay, PracticeBrief, PracticeSession, Scenario, SessionCompletion, TargetExpression, TodayStrategy } from "../types";
 import { PrimaryButton, SecondaryButton } from "./ui";
 import { VoiceRecorder } from "./VoiceRecorder";
 import { ScenarioPicker, SCENARIO_IMAGES } from "./ScenarioPicker";
@@ -149,6 +149,74 @@ function FeedbackCard({ item, onLocate }: { item: InlineFeedback; onLocate?: (tu
   );
 }
 
+/** 合并多轮错误报告：按错误类型+改写去重，累加频率 */
+function mergeRoundReports(reports: ErrorReport[]): ErrorReport {
+  const byKey = new Map<string, ErrorReportItem>();
+  let total = 0;
+  for (const report of reports) {
+    total += report.total_errors;
+    for (const err of report.errors) {
+      const key = `${err.error_type || err.rule_id || "general"}::${(err.better_expression || err.original_fragment || "").toLowerCase()}`;
+      const prev = byKey.get(key);
+      if (prev) {
+        prev.frequency = (prev.frequency || 1) + (err.frequency || 1);
+      } else {
+        byKey.set(key, { ...err, frequency: err.frequency || 1 });
+      }
+    }
+  }
+  const errors = [...byKey.values()].sort((a, b) => (b.frequency || 0) - (a.frequency || 0));
+  return {
+    total_errors: total,
+    unique_errors: errors.length,
+    errors,
+    by_error_type: {},
+    has_errors: errors.length > 0,
+  };
+}
+
+/** 练习结束总结卡片内的错误小结：合并全程错误报告，简要展示 */
+function SessionErrorSummary({ reports }: { reports: ErrorReport[] }) {
+  const merged = mergeRoundReports(reports);
+  if (!merged.has_errors) {
+    return null;
+  }
+  const shown = merged.errors.slice(0, 5);
+  const restCount = merged.errors.length - shown.length;
+  return (
+    <div className="session-error-summary" aria-label="练习错误小结">
+      <p className="feedback-card-label">错误小结</p>
+      <p className="round-report-stat">全程共 {merged.total_errors} 处错误 · {merged.unique_errors} 类</p>
+      <ul className="round-report-list">
+        {shown.map((err, index) => (
+          <li className="round-report-item" key={index}>
+            <div className="round-report-item-head">
+              <strong>{err.error_type || err.rule_id || "一般问题"}</strong>
+              {(err.frequency ?? 0) > 1 ? <span className="round-report-freq">×{err.frequency}</span> : null}
+            </div>
+            {err.original_fragment && err.better_expression ? (
+              <div className="correction-swap">
+                <div>
+                  <span>你说的是</span>
+                  <strong>{err.original_fragment}</strong>
+                </div>
+                <div aria-hidden="true" className="correction-arrow">→</div>
+                <div>
+                  <span>建议改成</span>
+                  <strong>{err.better_expression}</strong>
+                </div>
+              </div>
+            ) : err.reason_zh || err.feedback_text ? (
+              <p className="feedback-reason"><span>说明：</span>{err.reason_zh || err.feedback_text}</p>
+            ) : null}
+          </li>
+        ))}
+      </ul>
+      {restCount > 0 ? <p className="round-report-more">还有 {restCount} 类同类错误，已在对话中逐条指出</p> : null}
+    </div>
+  );
+}
+
 function LanguageSupportCard({ result }: { result: LanguageSupportResult }) {
   const mainText = result.meaning_zh || result.translation_zh || result.better_expression;
 
@@ -188,6 +256,8 @@ export function PracticeRoom({ day, scenario, todayStrategy, profileId, learning
   const [session, setSession] = useState<PracticeSession | null>(null);
   const [turns, setTurns] = useState<ConversationTurn[]>([]);
   const [feedbackTimeline, setFeedbackTimeline] = useState<FeedbackTimelineItem[]>([]);
+  // 每轮结束的总结板块数据：按轮次顺序追加该轮错误报告
+  const [roundErrorReports, setRoundErrorReports] = useState<ErrorReport[]>([]);
   const [practiceBrief, setPracticeBrief] = useState<PracticeBrief | null>(null);
   const [completion, setCompletion] = useState<SessionCompletion | null>(null);
   const [lessonPhase, setLessonPhase] = useState<LessonPhase>("practice");
@@ -399,6 +469,7 @@ export function PracticeRoom({ day, scenario, todayStrategy, profileId, learning
         setTurns(result.turns);
         const feedbackHistory = result.feedback_history || [];
         setFeedbackTimeline(feedbackTimelineItems(feedbackHistory));
+        setRoundErrorReports([]);
         setPracticeBrief(result.practice_brief || null);
         setCompletion(result.completion || null);
         const hasUserTurns = result.turns.some((turn) => turn.speaker === "user");
@@ -538,6 +609,10 @@ export function PracticeRoom({ day, scenario, todayStrategy, profileId, learning
       if (result.inline_feedback && result.inline_feedback.length > 0) {
         setFeedbackTimeline(current => [...current, ...feedbackTimelineItems(result.inline_feedback)]);
       }
+      // 每轮结束：把该轮错误报告追加到总结板块
+      if (result.round_error_report) {
+        setRoundErrorReports(current => [...current, result.round_error_report as ErrorReport]);
+      }
       // 语音条：把临时 id 迁移到后端返回的真实 user turn id，继续以语音条样式展示
       if (voiceTempId && result.user_turn) {
         setVoiceTurnIds((current) => {
@@ -580,10 +655,10 @@ export function PracticeRoom({ day, scenario, todayStrategy, profileId, learning
         }
       }
 
-    } catch {
+    } catch (error) {
       // Only set error if the stream completely failed to start
       if (!fullStreamedText) {
-        setApiError("发送失败，请稍后再试。")
+        setApiError(error instanceof Error && error.message.includes("会话已失效") ? error.message : "发送失败，请稍后再试。")
       } else {
         // If we got some text but then it crashed, we still want to keep the text
         setTurns((current) => {
@@ -669,6 +744,8 @@ export function PracticeRoom({ day, scenario, todayStrategy, profileId, learning
       const result = await deleteTurnPair(session.id, userTurnId);
       setTurns(result.turns);
       setFeedbackTimeline(feedbackTimelineItems(result.feedback_history));
+      // 回合被删除，历史轮次报告与回合对应关系失效，重新清空（重新载入会话时恢复为空）
+      setRoundErrorReports([]);
     } catch {
       setApiError("删除失败，请稍后再试。")
     } finally {
@@ -687,6 +764,7 @@ export function PracticeRoom({ day, scenario, todayStrategy, profileId, learning
       await clearSessionHistory(session.id);
       setTurns([]);
       setFeedbackTimeline([]);
+      setRoundErrorReports([]);
       setSession(null);
       setCompletion(null);
     } catch {
@@ -1027,6 +1105,8 @@ export function PracticeRoom({ day, scenario, todayStrategy, profileId, learning
                     {completion.completed_summary.reusable_sentences.length > 0 ? (
                       <p className="feedback-example">{completion.completed_summary.reusable_sentences[0]}</p>
                     ) : null}
+                    {/* 全程错误小结：合并每一轮的错误报告，简要呈现在结束总结中 */}
+                    {roundErrorReports.length > 0 ? <SessionErrorSummary reports={roundErrorReports} /> : null}
                     {nextPathItem || onFreeTalk ? (
                       <div className="topic-strip-actions continuation-actions">
                         {nextPathItem ? (

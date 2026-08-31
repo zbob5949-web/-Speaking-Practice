@@ -1,0 +1,368 @@
+[
+  {
+    "id": "airport-check-in",
+    "category": "出行",
+    "title": "Airport check-in",
+    "background": "You arrive at an airport and need to check in, choose a seat, and ask about baggage.",
+    "npc_role": "Airline check-in agent",
+    "learner_role": "Passenger",
+    "objective": "Complete check-in and confirm baggage and boarding details.",
+    "difficulty_bands": [
+      {
+        "level": "A1",
+        "vocabulary_range": "80-150 high-frequency travel words",
+        "sentence_complexity": "Short present-tense requests",
+        "target_functions": [
+          "greet",
+          "state destination",
+          "ask for help"
+        ]
+      },
+      {
+        "level": "A2",
+        "vocabulary_range": "150-300 travel and time words",
+        "sentence_complexity": "Because/when clauses and polite can/could requests",
+        "target_functions": [
+          "give booking details",
+          "ask about baggage",
+          "confirm time"
+        ]
+      },
+      {
+        "level": "B1",
+        "vocabulary_range": "300-600 travel-service words",
+        "sentence_complexity": "Past explanations and connected follow-up questions",
+        "target_functions": [
+          "explain a problem",
+          "negotiate a seat",
+          "confirm a solution"
+        ]
+      },
+      {
+        "level": "B2",
+        "vocabulary_range": "600-900 service and policy words",
+        "sentence_complexity": "Conditionals, modifiers, and precise clarification",
+        "target_functions": [
+          "compare options",
+          "challenge a restriction",
+          "summarize the agreement"
+        ]
+      },
+      {
+        "level": "C1",
+        "vocabulary_range": "900+ nuanced service vocabulary",
+        "sentence_complexity": "Spontaneous multi-clause negotiation",
+        "target_functions": [
+          "handle an exception",
+          "justify a request",
+          "paraphrase policy"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "hotel-check-in",
+    "category": "出行",
+    "title": "Hotel check-in",
+    "background": "You arrive at a hotel, explain a delayed flight, check your reservation, and request a room service.",
+    "npc_role": "Hotel receptionist",
+    "learner_role": "Guest",
+    "objective": "Check in smoothly and resolve one reservation or room request.",
+    "difficulty_bands": [
+      {
+        "level": "A1",
+        "vocabulary_range": "80-150 hotel and personal words",
+        "sentence_complexity": "Simple be/have sentences",
+        "target_functions": [
+          "give your name",
+          "show a booking",
+          "ask for a key"
+        ]
+      },
+      {
+        "level": "A2",
+        "vocabulary_range": "150-300 hotel and time words",
+        "sentence_complexity": "Past simple reasons plus polite requests",
+        "target_functions": [
+          "explain arrival",
+          "ask about breakfast",
+          "confirm checkout"
+        ]
+      },
+      {
+        "level": "B1",
+        "vocabulary_range": "300-600 accommodation words",
+        "sentence_complexity": "Relative clauses and cause/effect connectors",
+        "target_functions": [
+          "report a booking issue",
+          "request a change",
+          "confirm alternatives"
+        ]
+      },
+      {
+        "level": "B2",
+        "vocabulary_range": "600-900 hospitality and policy words",
+        "sentence_complexity": "Conditionals and nuanced complaints",
+        "target_functions": [
+          "negotiate compensation",
+          "compare room options",
+          "justify a preference"
+        ]
+      },
+      {
+        "level": "C1",
+        "vocabulary_range": "900+ formal hospitality vocabulary",
+        "sentence_complexity": "Flexible register and complex negotiation",
+        "target_functions": [
+          "resolve a dispute",
+          "reframe a policy",
+          "reach a compromise"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "restaurant-order",
+    "category": "餐饮",
+    "title": "Restaurant order",
+    "background": "You are ordering a meal, checking ingredients, and responding to a change in availability.",
+    "npc_role": "Waiter or restaurant manager",
+    "learner_role": "Diner",
+    "objective": "Order a suitable meal and handle one dietary or availability constraint.",
+    "difficulty_bands": [
+      {
+        "level": "A1",
+        "vocabulary_range": "80-150 food words",
+        "sentence_complexity": "Short requests with like/want",
+        "target_functions": [
+          "choose a dish",
+          "ask for water",
+          "pay"
+        ]
+      },
+      {
+        "level": "A2",
+        "vocabulary_range": "150-300 food and preference words",
+        "sentence_complexity": "Countable nouns and simple questions",
+        "target_functions": [
+          "ask about ingredients",
+          "state a preference",
+          "request the bill"
+        ]
+      },
+      {
+        "level": "B1",
+        "vocabulary_range": "300-600 menu and dietary words",
+        "sentence_complexity": "Reason clauses and comparatives",
+        "target_functions": [
+          "explain a restriction",
+          "choose an alternative",
+          "give feedback"
+        ]
+      },
+      {
+        "level": "B2",
+        "vocabulary_range": "600-900 culinary and service words",
+        "sentence_complexity": "Concessions, conditionals, and precise qualifiers",
+        "target_functions": [
+          "customize an order",
+          "raise a problem",
+          "propose a solution"
+        ]
+      },
+      {
+        "level": "C1",
+        "vocabulary_range": "900+ nuanced food and service vocabulary",
+        "sentence_complexity": "Persuasive and tactful discourse",
+        "target_functions": [
+          "discuss provenance",
+          "resolve a service failure",
+          "recommend an option"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "job-interview",
+    "category": "职场",
+    "title": "Job interview",
+    "background": "You are interviewing for a role and must describe experience, strengths, and a response to a work problem.",
+    "npc_role": "Hiring manager",
+    "learner_role": "Candidate",
+    "objective": "Answer competency questions with evidence and ask one informed question.",
+    "difficulty_bands": [
+      {
+        "level": "A1",
+        "vocabulary_range": "100-200 work and personal words",
+        "sentence_complexity": "Simple past and present sentences",
+        "target_functions": [
+          "introduce yourself",
+          "state a skill",
+          "answer a simple question"
+        ]
+      },
+      {
+        "level": "A2",
+        "vocabulary_range": "200-400 common workplace words",
+        "sentence_complexity": "Past events with first/then/because",
+        "target_functions": [
+          "describe a task",
+          "state a strength",
+          "ask about work"
+        ]
+      },
+      {
+        "level": "B1",
+        "vocabulary_range": "400-700 role-specific words",
+        "sentence_complexity": "STAR-style narratives and contrasting clauses",
+        "target_functions": [
+          "give evidence",
+          "explain a challenge",
+          "ask a follow-up"
+        ]
+      },
+      {
+        "level": "B2",
+        "vocabulary_range": "700-1100 professional vocabulary",
+        "sentence_complexity": "Conditionals, passive voice, and nuanced claims",
+        "target_functions": [
+          "defend a decision",
+          "compare approaches",
+          "discuss trade-offs"
+        ]
+      },
+      {
+        "level": "C1",
+        "vocabulary_range": "1100+ domain and strategic vocabulary",
+        "sentence_complexity": "Structured persuasive answers with register control",
+        "target_functions": [
+          "lead a case discussion",
+          "challenge an assumption",
+          "summarize impact"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "doctor-visit",
+    "category": "医疗",
+    "title": "Doctor visit",
+    "background": "You describe symptoms, answer follow-up questions, and clarify a treatment instruction.",
+    "npc_role": "Doctor or nurse",
+    "learner_role": "Patient",
+    "objective": "Describe symptoms accurately and confirm what to do next.",
+    "difficulty_bands": [
+      {
+        "level": "A1",
+        "vocabulary_range": "80-160 body and symptom words",
+        "sentence_complexity": "Simple have/be sentences",
+        "target_functions": [
+          "name a symptom",
+          "say when it started",
+          "ask for help"
+        ]
+      },
+      {
+        "level": "A2",
+        "vocabulary_range": "160-320 health and time words",
+        "sentence_complexity": "Since/for, frequency, and simple comparisons",
+        "target_functions": [
+          "describe duration",
+          "rate severity",
+          "confirm medicine"
+        ]
+      },
+      {
+        "level": "B1",
+        "vocabulary_range": "320-650 health-service words",
+        "sentence_complexity": "Sequenced history and conditional advice",
+        "target_functions": [
+          "explain change",
+          "report a response",
+          "ask about warning signs"
+        ]
+      },
+      {
+        "level": "B2",
+        "vocabulary_range": "650-1000 clinical and lifestyle words",
+        "sentence_complexity": "Precise qualifiers and reported information",
+        "target_functions": [
+          "compare symptoms",
+          "clarify risk",
+          "summarize instructions"
+        ]
+      },
+      {
+        "level": "C1",
+        "vocabulary_range": "1000+ nuanced health vocabulary",
+        "sentence_complexity": "Tactful, precise explanation of uncertainty",
+        "target_functions": [
+          "question a plan",
+          "weigh options",
+          "negotiate follow-up"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "shopping-return",
+    "category": "购物",
+    "title": "Shopping and return",
+    "background": "You bought an item, discover a problem, and ask a shop assistant about an exchange or refund.",
+    "npc_role": "Shop assistant",
+    "learner_role": "Customer",
+    "objective": "Explain the issue, refer to the purchase, and agree on a remedy.",
+    "difficulty_bands": [
+      {
+        "level": "A1",
+        "vocabulary_range": "80-160 shopping words",
+        "sentence_complexity": "Short statements and can/can't",
+        "target_functions": [
+          "name an item",
+          "state a problem",
+          "ask the price"
+        ]
+      },
+      {
+        "level": "A2",
+        "vocabulary_range": "160-320 shopping and payment words",
+        "sentence_complexity": "Past purchase details and polite questions",
+        "target_functions": [
+          "show a receipt",
+          "ask for an exchange",
+          "confirm a size"
+        ]
+      },
+      {
+        "level": "B1",
+        "vocabulary_range": "320-650 product and policy words",
+        "sentence_complexity": "Cause/effect and comparison",
+        "target_functions": [
+          "describe a defect",
+          "explain preference",
+          "ask about policy"
+        ]
+      },
+      {
+        "level": "B2",
+        "vocabulary_range": "650-1000 consumer-service words",
+        "sentence_complexity": "Conditionals and tactful disagreement",
+        "target_functions": [
+          "challenge a decision",
+          "propose a remedy",
+          "summarize terms"
+        ]
+      },
+      {
+        "level": "C1",
+        "vocabulary_range": "1000+ formal consumer vocabulary",
+        "sentence_complexity": "Persuasive complaint with concessions",
+        "target_functions": [
+          "escalate a case",
+          "reference evidence",
+          "reach a fair settlement"
+        ]
+      }
+    ]
+  }
+]

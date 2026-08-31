@@ -10,7 +10,9 @@ from app.completion import build_completion_status, build_completion_summary, is
 from app import dependencies as deps
 from app.models import CompleteSessionRequest, StartSessionRequest, UserTurnRequest
 from app.scenarios import SCENARIO_EXPRESSIONS, SCENARIO_OPENERS, get_scenario, tier_for_level
+from app.error_aggregation import aggregate_errors
 from app.services.practice_brief import load_brief
+from app.services.enhanced_turn import _save_round_report
 
 
 def _scenario_brief(scenario: dict) -> dict:
@@ -417,6 +419,10 @@ def stream_user_turn(request: UserTurnRequest):
     """SSE 流式回合：边生成边推送，反馈并行计算。"""
     repo = deps.get_repository()
 
+    # 0. 校验会话存在：避免「先写回合、后查会话 404」导致 SSE 流中途中断成空流
+    if repo.get_session(request.session_id) is None:
+        raise HTTPException(status_code=404, detail="Session not found")
+
     # 1. Save user turn
     user_turn = repo.add_turn(request.session_id, "user", request.text)
     turns = repo.get_turns(request.session_id)
@@ -479,10 +485,21 @@ def stream_user_turn(request: UserTurnRequest):
             feedback = []
 
         saved_feedback = repo.save_inline_feedback(request.session_id, user_turn["id"], feedback)
+
+        # 6.5 本轮错误报告：聚合本轮反馈并持久化，随 meta 一起输出
+        round_report = aggregate_errors(saved_feedback)
+        round_report["turn_id"] = user_turn["id"]
+        try:
+            _save_round_report(settings.database_path, request.session_id, round_report)
+        except Exception as e:
+            print(f"Save round report failed: {e}")
+        all_feedback = repo.get_inline_feedback_for_session(request.session_id)
+        session_error_report = aggregate_errors(all_feedback)
+
         completion = build_completion_status(
             repo.get_session(request.session_id) or session,
             repo.get_turns(request.session_id),
-            repo.get_inline_feedback_for_session(request.session_id),
+            all_feedback,
             brief or {},
             user_level=ctx["user_level"],
         )
@@ -492,6 +509,8 @@ def stream_user_turn(request: UserTurnRequest):
             "type": "meta",
             "hints": hints,
             "inline_feedback": saved_feedback,
+            "round_error_report": round_report,
+            "session_error_report": session_error_report,
             "user_turn": user_turn,
             "assistant_turn": assistant_turn,
             "completion": completion,

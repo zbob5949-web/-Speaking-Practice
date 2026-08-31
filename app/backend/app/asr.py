@@ -139,16 +139,52 @@ class AsrEngine:
 
 
 def decode_audio_to_float32(audio_bytes: bytes, sample_rate: int = 16000) -> "np.ndarray":
-    """用 miniaudio 解码任意受支持格式（MP3/WAV/OGG…）到 16kHz 单声道 float32。"""
+    """解码任意受支持格式到 16kHz 单声道 float32。
+
+    优先用 miniaudio 快速解码（WAV/MP3/OGG/FLAC）；
+    若失败（如 WebM/Opus、M4A 等 miniaudio 不支持的容器），
+    回退到 ffmpeg 转码为 16kHz 单声道 f32le PCM。
+    """
     if np is None:
         raise RuntimeError("numpy 未安装，请先 pip install numpy")
-    decoded = miniaudio.decode(
-        audio_bytes,
-        output_format=miniaudio.SampleFormat.FLOAT32,
-        nchannels=1,
-        sample_rate=sample_rate,
-    )
-    return np.frombuffer(decoded.samples, dtype=np.float32)
+
+    # 快路径：miniaudio 直接解
+    try:
+        decoded = miniaudio.decode(
+            audio_bytes,
+            output_format=miniaudio.SampleFormat.FLOAT32,
+            nchannels=1,
+            sample_rate=sample_rate,
+        )
+        return np.frombuffer(decoded.samples, dtype=np.float32)
+    except Exception:
+        pass  # 落入 ffmpeg 兜底
+
+    # 兜底路径：ffmpeg 转 16k mono f32le PCM（支持 webm/opus、m4a/aac 等）
+    import subprocess
+
+    try:
+        proc = subprocess.run(
+            [
+                "ffmpeg", "-hide_banner", "-loglevel", "error",
+                "-i", "pipe:0",
+                "-f", "f32le", "-ac", "1", "-ar", str(sample_rate),
+                "pipe:1",
+            ],
+            input=audio_bytes,
+            capture_output=True,
+            timeout=30,
+        )
+    except FileNotFoundError:
+        raise RuntimeError("音频解码失败：服务器缺少 ffmpeg") from None
+    except subprocess.TimeoutExpired:
+        raise RuntimeError("音频解码超时") from None
+    if proc.returncode != 0 or not proc.stdout:
+        raise RuntimeError(
+            f"音频解码失败（ffmpeg 退出码 {proc.returncode}）: "
+            f"{proc.stderr.decode(errors='replace')[:300]}"
+        )
+    return np.frombuffer(proc.stdout, dtype=np.float32)
 
 
 def normalize_volume(samples: "np.ndarray") -> "np.ndarray":

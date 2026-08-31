@@ -1,0 +1,170 @@
+[
+  {
+    "rule_id": "subject_verb_agreement",
+    "error_type": "主谓一致",
+    "title": "主语和动词一致",
+    "explanation_zh": "第三人称单数、be 动词和 have 要与主语匹配。",
+    "source_key": "subject_verb_agreement"
+  },
+  {
+    "rule_id": "third_person_present",
+    "error_type": "第三人称单数",
+    "title": "一般现在时第三人称",
+    "explanation_zh": "he、she、it 后面的实义动词通常需要 -s 或 -es。",
+    "source_key": "third_person_present"
+  },
+  {
+    "rule_id": "past_simple",
+    "error_type": "一般过去时",
+    "title": "过去时间搭配",
+    "explanation_zh": "yesterday、last...、...ago 等已结束时间通常搭配过去式。",
+    "source_key": "past_simple"
+  },
+  {
+    "rule_id": "present_perfect",
+    "error_type": "现在完成时",
+    "title": "have/has + 过去分词",
+    "explanation_zh": "现在完成时需要 have/has 加过去分词。",
+    "source_key": "present_perfect"
+  },
+  {
+    "rule_id": "article_a_an",
+    "error_type": "冠词",
+    "title": "不定冠词",
+    "explanation_zh": "单数可数名词第一次出现时通常需要 a 或 an。",
+    "source_key": "article_a_an"
+  },
+  {
+    "rule_id": "quantifiers",
+    "error_type": "数量词",
+    "title": "many/much 搭配",
+    "explanation_zh": "many 修饰可数名词复数，much 修饰不可数名词。",
+    "source_key": "quantifiers"
+  },
+  {
+    "rule_id": "preposition_collocation",
+    "error_type": "介词搭配",
+    "title": "固定介词搭配",
+    "explanation_zh": "部分形容词和动词需要固定介词搭配。",
+    "source_key": "preposition_collocation"
+  },
+  {
+    "rule_id": "gerund_infinitive",
+    "error_type": "非谓语动词",
+    "title": "动词后接形式",
+    "explanation_zh": "enjoy/avoid/finish 后接动名词，want/need/hope 后接 to do。",
+    "source_key": "gerund_infinitive"
+  },
+  {
+    "rule_id": "modal_base_form",
+    "error_type": "情态动词",
+    "title": "情态动词后接原形",
+    "explanation_zh": "can、should、must 后直接使用动词原形。",
+    "source_key": "modal_base_form"
+  },
+  {
+    "rule_id": "question_word_order",
+    "error_type": "疑问句语序",
+    "title": "疑问句倒装",
+    "explanation_zh": "多数特殊疑问句需要把助动词或 be 动词放到主语前。",
+    "source_key": "question_word_order"
+  },
+  {
+    "rule_id": "comparative_form",
+    "error_type": "比较级",
+    "title": "比较级形式",
+    "explanation_zh": "不要把 more 与已经带比较级的形容词重复使用。",
+    "source_key": "comparative_form"
+  },
+  {
+    "rule_id": "uncountable_nouns",
+    "error_type": "不可数名词",
+    "title": "不可数名词复数",
+    "explanation_zh": "advice、information、feedback 等通常不加复数 -s。",
+    "source_key": "uncountable_nouns"
+  },
+  {
+    "rule_id": "because_so_conjunction",
+    "error_type": "连词冗余",
+    "title": "because 与 so 连用",
+    "explanation_zh": "汉语“因为…所以…”成对迁移，英语一个连词即可。",
+    "source_key": "because_so_conjunction"
+  },
+  {
+    "rule_id": "although_but_conjunction",
+    "error_type": "让步连词冗余",
+    "title": "although 与 but 连用",
+    "explanation_zh": "although 已表达让步，不能再加 but。",
+    "source_key": "although_but_conjunction"
+  },
+  {
+    "rule_id": "pronoun_gender_confusion",
+    "error_type": "人称代词性别混淆",
+    "title": "he/she 与性别名词不一致",
+    "explanation_zh": "汉语“他/她”同音，英语代词要与所指的性别一致。",
+    "source_key": "pronoun_gender_confusion"
+  },
+  {
+    "rule_id": "countable_plural_missing",
+    "error_type": "可数名词漏复数",
+    "title": "数量词后的可数名词用复数",
+    "explanation_zh": "中文没有复数概念，数字或数量词后的可数名词要用复数形式。",
+    "source_key": "countable_plural_missing"
+  },
+  {
+    "rule_id": "want_to_infinitive",
+    "error_type": "不定式缺失",
+    "title": "want 后接 to do",
+    "explanation_zh": "want、need、hope、plan 等动词后要用 to 加动词原形。",
+    "source_key": "want_to_infinitive"
+  },
+  {
+    "rule_id": "very_adverb_position",
+    "error_type": "副词误用",
+    "title": "very 不能直接修饰动词",
+    "explanation_zh": "very 修饰形容词或副词，动词前用 really，或用 like ... very much。",
+    "source_key": "very_adverb_position"
+  },
+  {
+    "rule_id": "there_is_are_agreement",
+    "error_type": "there be 一致",
+    "title": "there is 与复数主语",
+    "explanation_zh": "there be 的 be 要与后面的名词一致，复数名词用 there are。",
+    "source_key": "there_is_are_agreement"
+  },
+  {
+    "rule_id": "time_preposition",
+    "error_type": "时间介词搭配",
+    "title": "in/at/on 时间误用",
+    "explanation_zh": "星期用 on，一天中的时段用 in the，night/noon/midnight 用 at。",
+    "source_key": "time_preposition"
+  },
+  {
+    "rule_id": "if_will_conditional",
+    "error_type": "条件句时态",
+    "title": "if 从句不用 will",
+    "explanation_zh": "if 条件从句用一般现在时表示将来，不用 will。",
+    "source_key": "if_will_conditional"
+  },
+  {
+    "rule_id": "so_such_confusion",
+    "error_type": "so/such 误用",
+    "title": "so 与 such 结构",
+    "explanation_zh": "so 后接形容词，such a/an 后接形容词加名词。",
+    "source_key": "so_such_confusion"
+  },
+  {
+    "rule_id": "few_little_quantifier",
+    "error_type": "数量词误用",
+    "title": "a few 与 a little",
+    "explanation_zh": "a few 修饰可数名词复数，a little 修饰不可数名词。",
+    "source_key": "few_little_quantifier"
+  },
+  {
+    "rule_id": "present_continuous_missing_be",
+    "error_type": "现在进行时缺 be",
+    "title": "进行时缺 be 动词",
+    "explanation_zh": "现在进行时用 be + 动词ing，不能省略 be。",
+    "source_key": "present_continuous_missing_be"
+  }
+]

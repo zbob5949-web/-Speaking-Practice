@@ -3,6 +3,8 @@ import json
 
 import httpx
 
+from app.context import current_user_id
+
 
 class LLMProvider(Protocol):
     def complete(self, system_prompt: str, user_prompt: str) -> str:
@@ -97,7 +99,7 @@ class OpenRouterProvider:
         self.post_json = post_json
         self.post_json_stream = post_json_stream
 
-    def complete(self, system_prompt: str, user_prompt: str) -> str:
+    def complete(self, system_prompt: str, user_prompt: str, timeout: float = 30.0) -> str:
         request_body = {
             "model": self.model,
             "messages": [
@@ -105,7 +107,12 @@ class OpenRouterProvider:
                 {"role": "user", "content": user_prompt},
             ],
             "temperature": 0.7,
+            "max_tokens": 800,
+            "thinking": {"type": "disabled"},
         }
+        uid = current_user_id.get()
+        if uid:
+            request_body["user_id"] = uid
         prompt_lower = system_prompt.lower()
         asks_json_object = "json object" in prompt_lower or "json 对象" in prompt_lower
         asks_json_array = "json array" in prompt_lower or "json 数组" in prompt_lower
@@ -121,11 +128,25 @@ class OpenRouterProvider:
                 "X-Title": "SpeakMate Agent",
             },
             request_body,
-            30.0,
+            timeout,
         )
         return data["choices"][0]["message"]["content"].strip()
 
     def stream_complete(self, system_prompt: str, user_prompt: str) -> Iterator[str]:
+        request_body = {
+            "model": self.model,
+            "messages": [
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt},
+            ],
+            "temperature": 0.7,
+            "stream": True,
+            "max_tokens": 800,
+            "thinking": {"type": "disabled"},
+        }
+        uid = current_user_id.get()
+        if uid:
+            request_body["user_id"] = uid
         stream = self.post_json_stream(
             f"{self.base_url}/chat/completions",
             {
@@ -134,21 +155,14 @@ class OpenRouterProvider:
                 "HTTP-Referer": "http://localhost:5173",
                 "X-Title": "SpeakMate Agent",
             },
-            {
-                "model": self.model,
-                "messages": [
-                    {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": user_prompt},
-                ],
-                "temperature": 0.7,
-                "stream": True,
-            },
+            request_body,
             30.0,
         )
         for chunk in stream:
             delta = chunk["choices"][0].get("delta", {})
-            if "content" in delta:
-                yield delta["content"]
+            content = delta.get("content")
+            if content:
+                yield content
 
 
 def create_llm_provider(
@@ -157,7 +171,7 @@ def create_llm_provider(
     base_url: str | None,
     model: str,
 ) -> LLMProvider:
-    if provider_name == "openrouter" and api_key:
+    if provider_name in ("openrouter", "deepseek") and api_key:
         return OpenRouterProvider(
             api_key=api_key,
             base_url=base_url or "https://openrouter.ai/api/v1",

@@ -1,0 +1,152 @@
+# SpeakMate — 英语口语陪练 AI Agent
+
+## 提交版 · 评委快速启动指南
+
+═══════════════════════════════════════════════════════
+
+## 📋 环境要求
+
+- Python 3.11+
+- 能够访问外网（调用 LLM API，如 OpenRouter / DeepSeek；不配置 Key 则运行于内置演示模式）
+- 无需安装 Node.js —— 前端已预编译至 `app/frontend/dist`，本提交版已做单端口发布（页面与 API 同在 8000 端口）
+- 语音对话需下载离线识别模型（约 100MB，国内推荐 hf-mirror 镜像，见下方「🎤 下载语音识别模型」）；不下载仅语音功能不可用，打字对话不受影响
+
+═══════════════════════════════════════════════════════
+
+## 🚀 三步启动
+
+### 第一步：配置环境变量（可选）
+
+将项目根目录 `.env.example` 复制为 `.env`，填入 LLM API Key：
+
+```
+LLM_PROVIDER=openrouter                        ← 可选，openrouter / deepseek / fake
+LLM_API_KEY=你的Key                             ← 可选；不填则用内置演示模式
+LLM_BASE_URL=https://openrouter.ai/api/v1      ← 按 provider 调整
+PLANNER_MODEL=deepseek/deepseek-v4-pro         ← 计划/复盘模型
+CHAT_MODEL=deepseek/deepseek-v4-flash          ← 对话/纠错模型
+```
+
+> 不配置 Key 也能启动与演示（fake 模式）；配置真实 Key 后全部 Agent 能力生效。
+
+### 第二步：安装 Python 依赖
+
+```bash
+cd speaking\ practice\ 提交版
+pip install -r requirements.txt
+```
+
+### 第三步：启动
+
+```bash
+cd app/backend
+python -m uvicorn app.main:app --host 0.0.0.0 --port 8000
+```
+
+启动成功后浏览器打开 → **http://localhost:8000**
+
+═══════════════════════════════════════════════════════
+
+## 🎤 下载语音识别模型（可选，启用语音对话）
+
+语音识别使用 sherpa-onnx 的 whisper-tiny.en 离线模型（约 100MB，共 3 个文件）。
+**国内用户推荐 hf-mirror 镜像，速度快**；下载后放入 `data/asr_model/sherpa-onnx-whisper-tiny.en/`，启动时自动识别。
+不下载不影响打字对话、纠错、报告等功能。
+
+### 方式一：命令行下载（推荐，国内镜像）
+
+```powershell
+cd data
+mkdir asr_model\sherpa-onnx-whisper-tiny.en
+cd asr_model\sherpa-onnx-whisper-tiny.en
+curl -L -O https://hf-mirror.com/csukuangfj/sherpa-onnx-whisper-tiny.en/resolve/main/tiny.en-encoder.int8.onnx
+curl -L -O https://hf-mirror.com/csukuangfj/sherpa-onnx-whisper-tiny.en/resolve/main/tiny.en-decoder.int8.onnx
+curl -L -O https://hf-mirror.com/csukuangfj/sherpa-onnx-whisper-tiny.en/resolve/main/tiny.en-tokens.txt
+```
+
+### 方式二：浏览器下载
+
+1. 打开镜像页 https://hf-mirror.com/csukuangfj/sherpa-onnx-whisper-tiny.en → Files
+2. 下载上述 3 个文件，放入 `data/asr_model/sherpa-onnx-whisper-tiny.en/`
+
+### 方式三：GitHub 兜底（镜像不可用时）
+
+官方打包（解压后得到完整模型目录）：
+
+```
+https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-whisper-tiny.en.tar.bz2
+```
+
+验证：最终目录结构应为
+
+```
+data/asr_model/sherpa-onnx-whisper-tiny.en/
+  ├── tiny.en-encoder.int8.onnx
+  ├── tiny.en-decoder.int8.onnx
+  └── tiny.en-tokens.txt
+```
+
+═══════════════════════════════════════════════════════
+
+## 📱 访问地址
+
+| 地址 | 内容 |
+|------|------|
+| http://localhost:8000 | 应用主界面（登录 / 游客体验） |
+| http://localhost:8000/docs | API 文档（Swagger，14 组路由） |
+
+### 测试账号
+
+- 支持**游客直接体验**（登录页点"游客"进入，无需注册）
+- 也可注册手机号账号使用
+
+═══════════════════════════════════════════════════════
+
+## 🎯 核心功能演示路径
+
+1. **首次引导**：登录后填写学习目标 / 每天时长 / 当前水平（小白/中级/大神），生成分阶段学习计划
+2. **场景练习**：在"今日练习"或场景库选择场景（机场/酒店/餐厅/面试/就医/购物），点击卡片开始对话
+3. **实时纠错**：
+   - 输入英语句子（打字或语音），AI 教练以场景 NPC 身份回应
+   - 右侧"实时纠错"面板按频率列出同类错误合并后的纠错卡（你说的是 → 建议改成 → 为什么 → 下次直接说）
+   - 消息气泡右下角出现红色「!」感叹号表示该条有错误，点击直接展开这条的纠错
+4. **每轮报告**：每轮对话结束自动生成该轮错误报告（会话报告可在完成练习后查看）
+5. **语音闭环**：点击麦克风说话 → 离线识别 → 教练语音回复（可在设置中切换 14 种美/英/澳音色）
+6. **难度自适应**：连续答对正确率 ≥80% 时难度升档，<60% 时降档（词汇量与句型同步调整）
+7. **成长与记忆**："成长"页查看每日复盘、教练长期记忆（常犯错误类型）与针对性练习重点
+
+推荐测试话术（餐厅场景）：`I want to order a pizza and I am very hunger.`（故意包含主谓/拼写类错误，观察纠错与感叹号）
+
+═══════════════════════════════════════════════════════
+
+## 📂 项目结构
+
+```
+speaking practice 提交版/
+├── app/
+│   ├── backend/                FastAPI 后端
+│   │   ├── app/                核心包（语法引擎/8个Agent/场景库/语音/服务/路由）
+│   │   ├── tests/              pytest 测试（126 个用例）
+│   │   ├── pyproject.toml      后端依赖与 pytest 配置
+│   │   └── e2e_simulation.py   端到端全流程模拟脚本
+│   └── frontend/               React + Vite 前端
+│       ├── src/                前端源码
+│       ├── public/scenarios/   6 张场景配图
+│       └── dist/               构建产物（已预编译，单端口发布使用）
+├── data/asr_model/             sherpa-onnx 离线识别模型存放目录（需自行下载，见上方「🎤 下载语音识别模型」）
+├── docs/                       产品设计文档
+├── .env.example                环境变量模板（真实 Key 只放 .env，不随提交版分发）
+├── requirements.txt            Python 依赖
+├── 产品部署与使用手册.md        详细部署文档
+└── 启动说明.txt                本文件
+```
+
+═══════════════════════════════════════════════════════
+
+## ⚠️ 注意事项
+
+- 本提交版已内置：6 个场景、24 条语法规则、分级语法知识库（RAG）、前端构建产物；语音识别模型需按上方说明下载（约 100MB）
+- 数据默认存储在 `app/backend/data/coach.sqlite`（首次启动自动创建）
+- 如需重新构建前端：`cd app/frontend && npm install && npm run build`
+- 语音对话前请先下载 whisper-tiny 模型（见「🎤 下载语音识别模型」）；模型首次加载约需数秒
+- 如遇问题请查看《产品部署与使用手册.md》的常见问题部分

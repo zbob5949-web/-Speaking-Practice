@@ -1,6 +1,23 @@
-﻿import type { ConversationTurn, GrowthSummary, InlineFeedback, LanguageSupportMode, LanguageSupportResult, LearningPath, OnboardingResponse, PlanDay, PracticeBrief, PracticeSession, Profile, Scenario, ScenarioCatalog, SessionCompletion, SessionHistoryItem, TodayStrategy } from "./types";
+﻿import type { ConversationTurn, ErrorReport, GrowthSummary, InlineFeedback, LanguageSupportMode, LanguageSupportResult, LearningPath, OnboardingResponse, PlanDay, PracticeBrief, PracticeSession, Profile, Scenario, ScenarioCatalog, SessionCompletion, SessionHistoryItem, TodayStrategy } from "./types";
 
 const API_BASE = import.meta.env.VITE_API_BASE ?? "http://localhost:8000";
+
+/**
+ * 统一请求封装：自动附加登录 token；token 过期(401)时清理登录态。
+ * 登录/注册/游客接口本身不需要 token，由后端自行处理。
+ */
+async function apiFetch(input: RequestInfo | URL, init: RequestInit = {}): Promise<Response> {
+  const token = localStorage.getItem("speakmate-token");
+  const headers = new Headers(init.headers);
+  if (token) headers.set("Authorization", `Bearer ${token}`);
+  const response = await window.fetch(input, { ...init, headers });
+  if (response.status === 401 && typeof input === "string" && !input.includes("/api/auth/")) {
+    clearAuth();
+    throw new Error("登录已过期，请重新登录");
+  }
+  return response;
+}
+
 export type AsrResult = {
   text: string;
   provider: string;
@@ -12,7 +29,7 @@ export async function transcribeAudio(audio: Blob, filename?: string): Promise<A
   const formData = new FormData();
   const extension = audio.type.includes("mp4") ? "m4a" : "webm";
   formData.append("audio", audio, filename ?? "speakmate-recording." + extension);
-  const response = await fetch(API_BASE + "/api/asr", {
+  const response = await apiFetch(API_BASE + "/api/asr", {
     method: "POST",
     body: formData
   });
@@ -35,7 +52,7 @@ export async function createOnboarding(input: {
   daily_minutes: number;
   current_level: string;
 }): Promise<OnboardingResponse> {
-  const response = await fetch(`${API_BASE}/api/onboarding`, {
+  const response = await apiFetch(`${API_BASE}/api/onboarding`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(input)
@@ -47,12 +64,12 @@ export async function createOnboarding(input: {
 }
 
 export async function getProfiles(): Promise<{ profiles: Profile[] }> {
-  const response = await fetch(`${API_BASE}/api/profiles`);
+  const response = await apiFetch(`${API_BASE}/api/profiles`);
   return response.json();
 }
 
 export async function deleteProfile(profileId: number): Promise<void> {
-  const response = await fetch(`${API_BASE}/api/profiles/${profileId}`, {
+  const response = await apiFetch(`${API_BASE}/api/profiles/${profileId}`, {
     method: "DELETE"
   });
   if (!response.ok) {
@@ -61,14 +78,14 @@ export async function deleteProfile(profileId: number): Promise<void> {
 }
 
 export async function runDueReviews(): Promise<{ status: string; processed_days: number }> {
-  const res = await fetch(`${API_BASE}/api/daily-review/run-due`, { method: "POST" });
+  const res = await apiFetch(`${API_BASE}/api/daily-review/run-due`, { method: "POST" });
   if (!res.ok) throw new Error("Failed to run due reviews");
   return res.json();
 }
 
 export async function getCurrentLearningState(profileId?: number): Promise<OnboardingResponse> {
   const url = profileId ? `${API_BASE}/api/current?profile_id=${profileId}` : `${API_BASE}/api/current`;
-  const response = await fetch(url);
+  const response = await apiFetch(url);
   if (!response.ok) {
     throw new Error("No current learning state");
   }
@@ -77,7 +94,7 @@ export async function getCurrentLearningState(profileId?: number): Promise<Onboa
 
 export async function getGrowthSummary(profileId?: number): Promise<GrowthSummary> {
   const url = profileId ? `${API_BASE}/api/growth/summary?profile_id=${profileId}` : `${API_BASE}/api/growth/summary`;
-  const response = await fetch(url);
+  const response = await apiFetch(url);
   if (!response.ok) {
     throw new Error("Failed to get growth summary");
   }
@@ -86,7 +103,7 @@ export async function getGrowthSummary(profileId?: number): Promise<GrowthSummar
 
 export async function getTodayStrategy(profileId?: number): Promise<TodayStrategy> {
   const url = profileId ? `${API_BASE}/api/today/strategy?profile_id=${profileId}` : `${API_BASE}/api/today/strategy`;
-  const response = await fetch(url);
+  const response = await apiFetch(url);
   if (!response.ok) {
     throw new Error("Failed to get today strategy");
   }
@@ -101,7 +118,7 @@ export async function startSession(planDayId: number): Promise<{
   practice_brief?: PracticeBrief;
   completion?: SessionCompletion;
 }> {
-  const response = await fetch(`${API_BASE}/api/sessions/start`, {
+  const response = await apiFetch(`${API_BASE}/api/sessions/start`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ plan_day_id: planDayId })
@@ -122,7 +139,7 @@ export type StartScenarioSessionResult = {
 };
 
 export async function startScenarioSession(scenarioId: string, profileId?: number): Promise<StartScenarioSessionResult> {
-  const response = await fetch(`${API_BASE}/api/sessions/start`, {
+  const response = await apiFetch(`${API_BASE}/api/sessions/start`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ scenario_id: scenarioId, profile_id: profileId })
@@ -144,7 +161,7 @@ export async function getScenarios(
   if (filters?.tier) params.set("tier", filters.tier);
   const query = params.toString();
   const url = query ? `${API_BASE}/api/scenarios?${query}` : `${API_BASE}/api/scenarios`;
-  const response = await fetch(url);
+  const response = await apiFetch(url);
   if (!response.ok) {
     throw new Error("Failed to load scenarios");
   }
@@ -155,7 +172,7 @@ export async function getLearningPath(tier?: string, profileId?: number): Promis
   const params = new URLSearchParams();
   if (tier) params.set("tier", tier);
   if (profileId) params.set("profile_id", String(profileId));
-  const response = await fetch(`${API_BASE}/api/scenarios/learning-path?${params.toString()}`);
+  const response = await apiFetch(`${API_BASE}/api/scenarios/learning-path?${params.toString()}`);
   if (!response.ok) {
     throw new Error("Failed to load learning path");
   }
@@ -163,7 +180,7 @@ export async function getLearningPath(tier?: string, profileId?: number): Promis
 }
 
 export async function addFavorite(scenarioId: string, profileId: number): Promise<{ status: string }> {
-  const response = await fetch(`${API_BASE}/api/favorites/${scenarioId}?profile_id=${profileId}`, {
+  const response = await apiFetch(`${API_BASE}/api/favorites/${scenarioId}?profile_id=${profileId}`, {
     method: "POST"
   });
   if (!response.ok) {
@@ -173,7 +190,7 @@ export async function addFavorite(scenarioId: string, profileId: number): Promis
 }
 
 export async function removeFavorite(scenarioId: string, profileId: number): Promise<{ status: string; removed: boolean }> {
-  const response = await fetch(`${API_BASE}/api/favorites/${scenarioId}?profile_id=${profileId}`, {
+  const response = await apiFetch(`${API_BASE}/api/favorites/${scenarioId}?profile_id=${profileId}`, {
     method: "DELETE"
   });
   if (!response.ok) {
@@ -183,7 +200,7 @@ export async function removeFavorite(scenarioId: string, profileId: number): Pro
 }
 
 export async function getFavorites(profileId: number): Promise<{ favorites: Scenario[] }> {
-  const response = await fetch(`${API_BASE}/api/favorites?profile_id=${profileId}`);
+  const response = await apiFetch(`${API_BASE}/api/favorites?profile_id=${profileId}`);
   if (!response.ok) {
     throw new Error("Failed to load favorites");
   }
@@ -192,7 +209,7 @@ export async function getFavorites(profileId: number): Promise<{ favorites: Scen
 
 export async function getSessionHistory(profileId?: number): Promise<{ sessions: SessionHistoryItem[] }> {
   const url = profileId ? `${API_BASE}/api/sessions?profile_id=${profileId}` : `${API_BASE}/api/sessions`;
-  const response = await fetch(url);
+  const response = await apiFetch(url);
   if (!response.ok) {
     throw new Error("Failed to load session history");
   }
@@ -200,7 +217,7 @@ export async function getSessionHistory(profileId?: number): Promise<{ sessions:
 }
 
 export async function translateText(text: string): Promise<{ text: string; translation_zh: string }> {
-  const response = await fetch(`${API_BASE}/api/translate`, {
+  const response = await apiFetch(`${API_BASE}/api/translate`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ text })
@@ -223,7 +240,7 @@ export type AuthResult = {
 };
 
 async function authPost(path: string, body: Record<string, unknown>): Promise<AuthResult> {
-  const response = await fetch(`${API_BASE}${path}`, {
+  const response = await apiFetch(`${API_BASE}${path}`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body)
@@ -283,15 +300,22 @@ export async function sendUserTurnStream(
   inline_feedback: InlineFeedback[];
   hints: string[];
   completion?: SessionCompletion;
+  /** 本轮错误报告（后端每轮结束聚合输出） */
+  round_error_report?: ErrorReport | null;
+  /** 整个会话累计错误报告 */
+  session_error_report?: ErrorReport | null;
 }> {
-  const response = await fetch(`${API_BASE}/api/sessions/turn/stream`, {
+  const response = await apiFetch(`${API_BASE}/api/sessions/turn/stream`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ session_id: sessionId, text }),
   });
 
   if (!response.ok || !response.body) {
-    throw new Error("Failed to send turn");
+    if (response.status === 404) {
+      throw new Error("会话已失效，请重新开始练习");
+    }
+    throw new Error("发送失败，请稍后再试");
   }
 
   const reader = response.body.getReader();
@@ -340,7 +364,7 @@ export async function deleteTurnPair(sessionId: number, userTurnId: number): Pro
   turns: ConversationTurn[];
   feedback_history: InlineFeedback[];
 }> {
-  const response = await fetch(`${API_BASE}/api/sessions/${sessionId}/turn-pairs/${userTurnId}`, {
+  const response = await apiFetch(`${API_BASE}/api/sessions/${sessionId}/turn-pairs/${userTurnId}`, {
     method: "DELETE"
   });
   if (!response.ok) {
@@ -349,7 +373,7 @@ export async function deleteTurnPair(sessionId: number, userTurnId: number): Pro
   return response.json();
 }
 export async function clearSessionHistory(sessionId: number): Promise<void> {
-  const response = await fetch(`${API_BASE}/api/sessions/${sessionId}/history`, {
+  const response = await apiFetch(`${API_BASE}/api/sessions/${sessionId}/history`, {
     method: "DELETE"
   });
   if (!response.ok) {
@@ -365,7 +389,7 @@ export async function completeSession(
   plan_day: PlanDay;
   completion: SessionCompletion;
 }> {
-  const response = await fetch(`${API_BASE}/api/sessions/${sessionId}/complete`, {
+  const response = await apiFetch(`${API_BASE}/api/sessions/${sessionId}/complete`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ completion_type: completionType })
@@ -377,7 +401,7 @@ export async function completeSession(
 }
 
 export async function getPrompts(): Promise<{ prompts: Array<{ name: string; content: string; updated_at: string }> }> {
-  const response = await fetch(`${API_BASE}/api/prompts`);
+  const response = await apiFetch(`${API_BASE}/api/prompts`);
   if (!response.ok) {
     throw new Error("Failed to get prompts");
   }
@@ -385,7 +409,7 @@ export async function getPrompts(): Promise<{ prompts: Array<{ name: string; con
 }
 
 export async function updatePrompt(name: string, content: string): Promise<void> {
-  const response = await fetch(`${API_BASE}/api/prompts/${name}`, {
+  const response = await apiFetch(`${API_BASE}/api/prompts/${name}`, {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ content })
@@ -400,7 +424,7 @@ export async function requestLanguageSupport(input: {
   text: string;
   context?: string;
 }): Promise<LanguageSupportResult> {
-  const response = await fetch(`${API_BASE}/api/language-support`, {
+  const response = await apiFetch(`${API_BASE}/api/language-support`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ ...input, context: input.context || "" })
@@ -436,7 +460,7 @@ export function setSelectedVoice(voiceId: string): void {
 
 /** 获取可选陪练老师音色列表（含后端当前默认音色）。 */
 export async function getTTSVoices(): Promise<{ voices: TTSVoice[]; default_voice: string }> {
-  const response = await fetch(`${API_BASE}/api/tts/voices`);
+  const response = await apiFetch(`${API_BASE}/api/tts/voices`);
   if (!response.ok) {
     throw new Error("Failed to load voices");
   }
@@ -471,7 +495,7 @@ export function playAudioFromUrl(url: string): Promise<void> {
 export async function playTTS(text: string, voice?: string): Promise<void> {
   const body: { text: string; voice?: string } = { text };
   if (voice) body.voice = voice;
-  const response = await fetch(`${API_BASE}/api/tts`, {
+  const response = await apiFetch(`${API_BASE}/api/tts`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body)
@@ -501,3 +525,18 @@ export async function playTTS(text: string, voice?: string): Promise<void> {
   });
 }
 
+
+// ── App 版本检查（供「检查更新」使用） ──────────────────────────
+export type AppVersionInfo = {
+  version_code: number;
+  version_name: string;
+  apk_url: string;
+  changelog?: string;
+  updated_at?: string;
+};
+
+export async function getAppVersion(): Promise<AppVersionInfo> {
+  const response = await apiFetch(`${API_BASE}/api/app/version`);
+  if (!response.ok) throw new Error("检查更新失败");
+  return response.json();
+}

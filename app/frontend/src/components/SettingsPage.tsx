@@ -1,9 +1,31 @@
 import { useEffect, useState } from "react";
 import { PageHeader } from "./ui";
-import { getSelectedVoice, getTTSVoices, setSelectedVoice } from "../api";
+import { getAppVersion, getSelectedVoice, getTTSVoices, setSelectedVoice } from "../api";
 import type { TTSVoice } from "../api";
+import { APP_VERSION_CODE, APP_VERSION_NAME } from "../appVersion";
 
 export function SettingsPage() {
+  const [updateStatus, setUpdateStatus] = useState("");
+
+  const checkForUpdate = async () => {
+    setUpdateStatus("检查中…");
+    try {
+      const info = await getAppVersion();
+      if (info.version_code > APP_VERSION_CODE) {
+        setUpdateStatus(`发现新版本 v${info.version_name}，正在打开下载页…`);
+        try {
+          const { Browser } = await import("@capacitor/browser");
+          await Browser.open({ url: info.apk_url });
+        } catch {
+          window.open(info.apk_url, "_blank");
+        }
+      } else {
+        setUpdateStatus(`已是最新版本 v${APP_VERSION_NAME}`);
+      }
+    } catch {
+      setUpdateStatus("检查更新失败，请稍后再试");
+    }
+  };
   const [bilingualEnabled, setBilingualEnabled] = useState(
     () => localStorage.getItem("speakmate-bilingual") !== "off"
   );
@@ -100,6 +122,13 @@ export function SettingsPage() {
               <h2>SpeakMate</h2>
             </div>
             <p className="muted">场景口语陪练 · 按场景对话、实时语法纠错、难度随水平自适应。</p>
+            <p className="muted">当前版本 v{APP_VERSION_NAME}</p>
+            <div className="settings-update-row">
+              <button type="button" className="settings-logout-button" onClick={() => void checkForUpdate()}>
+                检查更新
+              </button>
+              {updateStatus ? <span className="muted settings-update-status">{updateStatus}</span> : null}
+            </div>
           </section>
         </div>
       </section>

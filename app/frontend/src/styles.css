@@ -4197,3 +4197,166 @@ button:active {
 .topic-strip-cover .topic-strip-context {
   color: rgba(255, 255, 255, 0.88);
 }
+
+/* ============================================================
+   每轮错误报告卡片：AI 回复后的「本轮总结」板块
+   ============================================================ */
+.round-report-card {
+  margin: 4px 0 12px;
+  border-left-color: var(--orange, #f59e0b);
+}
+
+.round-report-stat {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: #b45309;
+  white-space: nowrap;
+}
+
+.round-report-types {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.round-report-type-tag {
+  font-size: 0.72rem;
+  font-weight: 650;
+  color: #174ad5;
+  background: rgba(23, 74, 213, 0.08);
+  border: 1px solid rgba(23, 74, 213, 0.18);
+  border-radius: 999px;
+  padding: 2px 8px;
+}
+
+.round-report-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 10px;
+}
+
+.round-report-item {
+  border: 1px solid rgba(228, 231, 236, 0.95);
+  border-radius: 12px;
+  padding: 10px;
+  background: #ffffff;
+  display: grid;
+  gap: 6px;
+}
+
+.round-report-item-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.round-report-item-head strong {
+  font-size: 0.86rem;
+}
+
+.round-report-severity {
+  font-size: 0.7rem;
+  font-weight: 700;
+  border-radius: 999px;
+  padding: 1px 8px;
+}
+
+.round-report-severity-high {
+  color: #fff;
+  background: #dc2626;
+}
+
+.round-report-severity-medium {
+  color: #92400e;
+  background: #fef3c7;
+}
+
+.round-report-severity-low {
+  color: #166534;
+  background: #dcfce7;
+}
+
+.round-report-freq {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: #85868d;
+  background: rgba(0, 0, 0, 0.05);
+  border-radius: 999px;
+  padding: 1px 7px;
+}
+
+.round-report-fragment {
+  color: #26354f;
+}
+
+.round-report-examples {
+  font-size: 0.78rem;
+  color: #85868d;
+}
+
+/* 练习结束总结卡片内的错误小结 */
+.session-error-summary {
+  display: grid;
+  gap: 8px;
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px dashed rgba(228, 231, 236, 0.95);
+}
+
+.round-report-more {
+  font-size: 0.78rem;
+  color: #85868d;
+}
+
+/* App 更新横幅 */
+.update-banner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding: 10px 16px;
+  background: linear-gradient(135deg, #174ad5, #3b6ff5);
+  color: #fff;
+  font-size: 0.85rem;
+}
+
+.update-banner-text {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.update-banner-action {
+  border: none;
+  border-radius: 999px;
+  padding: 6px 14px;
+  background: #fff;
+  color: #174ad5;
+  font-weight: 700;
+  font-size: 0.8rem;
+  cursor: pointer;
+}
+
+.update-banner-dismiss {
+  border: 1px solid rgba(255, 255, 255, 0.5);
+  border-radius: 999px;
+  padding: 6px 12px;
+  background: transparent;
+  color: #fff;
+  font-size: 0.8rem;
+  cursor: pointer;
+}
+
+.settings-update-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-top: 8px;
+}
+
+.settings-update-status {
+  font-size: 0.8rem;
+}

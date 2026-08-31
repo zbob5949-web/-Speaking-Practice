@@ -1,0 +1,25 @@
+﻿rule_id,error_type,title,explanation_zh,source_key
+subject_verb_agreement,主谓一致,主语和动词一致,第三人称单数、be 动词和 have 要与主语匹配。,subject_verb_agreement
+third_person_present,第三人称单数,一般现在时第三人称,he、she、it 后面的实义动词通常需要 -s 或 -es。,third_person_present
+past_simple,一般过去时,过去时间搭配,yesterday、last...、...ago 等已结束时间通常搭配过去式。,past_simple
+present_perfect,现在完成时,have/has + 过去分词,现在完成时需要 have/has 加过去分词。,present_perfect
+article_a_an,冠词,不定冠词,单数可数名词第一次出现时通常需要 a 或 an。,article_a_an
+quantifiers,数量词,many/much 搭配,many 修饰可数名词复数，much 修饰不可数名词。,quantifiers
+preposition_collocation,介词搭配,固定介词搭配,部分形容词和动词需要固定介词搭配。,preposition_collocation
+gerund_infinitive,非谓语动词,动词后接形式,enjoy/avoid/finish 后接动名词，want/need/hope 后接 to do。,gerund_infinitive
+modal_base_form,情态动词,情态动词后接原形,can、should、must 后直接使用动词原形。,modal_base_form
+question_word_order,疑问句语序,疑问句倒装,多数特殊疑问句需要把助动词或 be 动词放到主语前。,question_word_order
+comparative_form,比较级,比较级形式,不要把 more 与已经带比较级的形容词重复使用。,comparative_form
+uncountable_nouns,不可数名词,不可数名词复数,advice、information、feedback 等通常不加复数 -s。,uncountable_nouns
+because_so_conjunction,连词冗余,because 与 so 连用,汉语“因为…所以…”成对迁移，英语一个连词即可。,because_so_conjunction
+although_but_conjunction,让步连词冗余,although 与 but 连用,although 已表达让步，不能再加 but。,although_but_conjunction
+pronoun_gender_confusion,人称代词性别混淆,he/she 与性别名词不一致,汉语“他/她”同音，英语代词要与所指的性别一致。,pronoun_gender_confusion
+countable_plural_missing,可数名词漏复数,数量词后的可数名词用复数,中文没有复数概念，数字或数量词后的可数名词要用复数形式。,countable_plural_missing
+want_to_infinitive,不定式缺失,want 后接 to do,want、need、hope、plan 等动词后要用 to 加动词原形。,want_to_infinitive
+very_adverb_position,副词误用,very 不能直接修饰动词,very 修饰形容词或副词，动词前用 really，或用 like ... very much。,very_adverb_position
+there_is_are_agreement,there be 一致,there is 与复数主语,there be 的 be 要与后面的名词一致，复数名词用 there are。,there_is_are_agreement
+time_preposition,时间介词搭配,in/at/on 时间误用,星期用 on，一天中的时段用 in the，night/noon/midnight 用 at。,time_preposition
+if_will_conditional,条件句时态,if 从句不用 will,if 条件从句用一般现在时表示将来，不用 will。,if_will_conditional
+so_such_confusion,so/such 误用,so 与 such 结构,so 后接形容词，such a/an 后接形容词加名词。,so_such_confusion
+few_little_quantifier,数量词误用,a few 与 a little,a few 修饰可数名词复数，a little 修饰不可数名词。,few_little_quantifier
+present_continuous_missing_be,现在进行时缺 be,进行时缺 be 动词,现在进行时用 be + 动词ing，不能省略 be。,present_continuous_missing_be
