@@ -1,9 +1,9 @@
-import { useEffect, useState } from "react";
-import { clearAuth, getAppVersion, getCurrentLearningState, getTodayStrategy, hasAuth, runDueReviews, stopActiveAudio } from "./api";
-import type { AppVersionInfo } from "./api";
-import { APP_VERSION_CODE } from "./appVersion";
+import { useEffect, useRef, useState } from "react";
+import { UNAUTHORIZED_EVENT, clearAuth, getCurrentLearningState, getTodayStrategy, hasAuth, runDueReviews, stopActiveAudio } from "./api";
 import { AppShell } from "./components/AppShell";
+import { DevicePreview } from "./components/DevicePreview";
 import { GrowthPage } from "./components/GrowthPage";
+import { HomePage } from "./components/HomePage";
 import { LoginPage } from "./components/LoginPage";
 import { PlanPage } from "./components/PlanPage";
 import { PracticeRoom } from "./components/PracticeRoom";
@@ -12,7 +12,7 @@ import { SettingsPage } from "./components/SettingsPage";
 import type { PlanDay, Profile, Scenario, TodayStrategy } from "./types";
 import type { AppView } from "./components/AppShell";
 
-type View = "loading" | "auth" | "today" | "scenes" | "practice" | "growth" | "me" | "settings";
+type View = "loading" | "auth" | "home" | "today" | "scenes" | "practice" | "growth" | "me" | "settings";
 
 /** 内置自由对话场景（不来自场景库，后端按 free_talk 特判处理） */
 const FREE_TALK_SCENARIO: Scenario = {
@@ -52,7 +52,7 @@ function readLastPath(): Scenario[] | null {
   }
 }
 
-export default function App() {
+function AppInner() {
   const [view, setView] = useState<View>("loading");
   const [authed, setAuthed] = useState(() => hasAuth());
   const [profile, setProfile] = useState<Profile | null>(null);
@@ -61,8 +61,9 @@ export default function App() {
   const [activeScenario, setActiveScenario] = useState<Scenario | null>(null);
   const [learningPath, setLearningPath] = useState<Scenario[] | null>(null);
   const [todayStrategy, setTodayStrategy] = useState<TodayStrategy | null>(null);
-  // App 更新提示：发现新版本时展示
-  const [updateInfo, setUpdateInfo] = useState<AppVersionInfo | null>(null);
+  // 返回栈：用于全局「返回上一页」
+  const viewStackRef = useRef<View[]>([]);
+  const [canBack, setCanBack] = useState(false);
 
   async function loadCurrentState(profileId?: number) {
     try {
@@ -79,18 +80,11 @@ export default function App() {
       } else {
         setTodayStrategy(null);
       }
-      // 恢复上次对话界面：登出再登入时回到上次的场景/自由对话，而不是回到刚注册的样子
-      const lastScenario = readLastScenario();
-      if (lastScenario) {
-        setActiveScenario(lastScenario);
-        setView("practice");
-        return;
-      }
-      setActiveScenario(null);
-      // 没有可用计划时不弹「首次设置」：直接进场景页，用户可以选场景开练
-      setView(nextDay ? "today" : "scenes");
+      // 登录后统一进入主页面（Learn / Review），不再自动跳进上次的对话
+      setActiveScenario(readLastScenario());
+      setView("home");
     } catch {
-      setView("scenes");
+      setView("home");
     }
   }
 
@@ -102,12 +96,15 @@ export default function App() {
     void loadCurrentState();
   }, [authed]);
 
-  // 检查 App 更新：必须在所有条件 return 之前注册（React hooks 规则）
+  // 令牌过期（任何接口返回 401）：api 层已清理本地登录态，这里把界面切回登录页，
+  // 否则会出现「界面还在、但每次操作都报登录已过期」的卡死状态。
   useEffect(() => {
-    if (authed) {
-      void checkAppUpdate();
+    function onUnauthorized() {
+      handleLogout();
     }
-  }, [authed]);
+    window.addEventListener(UNAUTHORIZED_EVENT, onUnauthorized);
+    return () => window.removeEventListener(UNAUTHORIZED_EVENT, onUnauthorized);
+  }, []);
 
   function handleLogout() {
     stopActiveAudio();
@@ -125,28 +122,6 @@ export default function App() {
   function handleAuthed() {
     setAuthed(true);
     void loadCurrentState();
-  }
-
-  /** 检查 App 新版本：发现新版本时弹更新横幅 */
-  async function checkAppUpdate() {
-    try {
-      const info = await getAppVersion();
-      if (info.version_code > APP_VERSION_CODE) {
-        setUpdateInfo(info);
-      }
-    } catch {
-      // 检查失败静默，不影响使用
-    }
-  }
-
-  /** 打开下载页（原生 App 用系统浏览器；网页直接新窗口） */
-  async function downloadUpdate(url: string) {
-    try {
-      const { Browser } = await import("@capacitor/browser");
-      await Browser.open({ url });
-    } catch {
-      window.open(url, "_blank");
-    }
   }
 
   const selectDay = (day: PlanDay) => {
@@ -191,8 +166,22 @@ export default function App() {
   const navigate = (nextView: AppView) => {
     // 切换界面时中断正在播放的音频（TTS / 语音条）
     stopActiveAudio();
+    // 记录返回栈（同一页面不重复入栈）
+    if (view !== nextView) {
+      viewStackRef.current = [...viewStackRef.current, view as View].slice(-10);
+      setCanBack(true);
+    }
     setView(nextView);
     localStorage.setItem("speakmate-last-view", nextView);
+  };
+
+  /** 返回：统一回主页面（不做多级回跳） */
+  const goBack = () => {
+    stopActiveAudio();
+    viewStackRef.current = [];
+    setCanBack(false);
+    setView("home");
+    localStorage.setItem("speakmate-last-view", "home");
   };
 
   if (view === "loading") {
@@ -210,7 +199,15 @@ export default function App() {
   const today = activeDay ?? plan.find((day) => day.status === "pending") ?? plan[0] ?? null;
 
   let content: React.ReactNode;
-  if (view === "today" || view === "practice") {
+  if (view === "home") {
+    content = (
+      <HomePage
+        profileId={profile?.id}
+        onStart={() => navigate("today")}
+        onReview={() => navigate("growth")}
+      />
+    );
+  } else if (view === "today" || view === "practice") {
     // 今日 与 练习 统一渲染同一 PracticeRoom：切换视图不卸载，保留对话与语音条状态；
     // 用户选过的场景会话在两种视图下都按 scenario 恢复。
     content = (
@@ -238,7 +235,11 @@ export default function App() {
     content = <GrowthPage profileId={profile?.id} />;
   } else if (view === "me") {
     content = profile ? (
-      <ProfilePage profile={profile} onSelectScenario={selectScenario} />
+      <ProfilePage
+        profile={profile}
+        onSelectScenario={selectScenario}
+        onNavigate={(next) => navigate(next as AppView)}
+      />
     ) : (
       <PlanPage profileId={undefined} activeScenarioId={null} onStartScenario={selectScenario} onStartPath={startPathScenario} onLearningPathGenerated={handleLearningPathGenerated} />
     );
@@ -269,15 +270,26 @@ export default function App() {
   }
 
   return (
-    <AppShell activeView={view as AppView} onNavigate={navigate} onLogout={handleLogout}>
-      {updateInfo ? (
-        <div className="update-banner" role="status" aria-label="发现新版本">
-          <span className="update-banner-text">发现新版本 v{updateInfo.version_name}，更新内容：{updateInfo.changelog || "修复与优化"}</span>
-          <button type="button" className="update-banner-action" onClick={() => void downloadUpdate(updateInfo.apk_url)}>立即更新</button>
-          <button type="button" className="update-banner-dismiss" onClick={() => setUpdateInfo(null)}>稍后</button>
-        </div>
-      ) : null}
+    <AppShell
+      activeView={view as AppView}
+      onNavigate={navigate}
+      onLogout={handleLogout}
+      onBack={goBack}
+      canBack={canBack}
+    >
       {content}
     </AppShell>
+  );
+}
+
+/**
+ * 外层只负责「电脑 / 手机」布局切换壳，业务逻辑仍在 AppInner。
+ * 手机模式用 iframe（宽度 390px）承载同一个应用，@media 断点会真实命中。
+ */
+export default function App() {
+  return (
+    <DevicePreview>
+      <AppInner />
+    </DevicePreview>
   );
 }

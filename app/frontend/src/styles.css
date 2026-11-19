@@ -4360,3 +4360,2495 @@ button:active {
 .settings-update-status {
   font-size: 0.8rem;
 }
+
+/* iPhone browser and touch baseline. Keep desktop layout unchanged. */
+html {
+  min-height: 100%;
+  -webkit-tap-highlight-color: transparent;
+  -webkit-text-size-adjust: 100%;
+  overscroll-behavior: none;
+}
+
+body {
+  min-height: 100vh;
+  min-height: 100dvh;
+  overscroll-behavior: none;
+}
+
+button,
+a,
+[role="button"] {
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+
+button,
+[role="button"] {
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+}
+
+input,
+textarea,
+select {
+  font-size: 16px;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .project-list-item:hover {
+    border-color: var(--green);
+    background: #2b2b2f;
+  }
+
+  .nav-item:hover {
+    color: #fff;
+    background: #222225;
+  }
+
+  .nav-item-active:hover {
+    color: var(--nav);
+    background: var(--green);
+  }
+
+  .settings-goal-card:hover {
+    border-color: rgba(43, 103, 246, 0.26);
+    box-shadow: 0 14px 28px rgba(20, 33, 61, 0.08);
+  }
+
+  .message-action-button:hover {
+    color: var(--ink);
+    background: #f0f1f2;
+  }
+
+  .phone-mode-btn:hover:not(:disabled) {
+    border-color: var(--ink);
+  }
+}
+
+@media (max-width: 900px) {
+  html,
+  body,
+  #root {
+    width: 100%;
+    min-width: 0;
+    min-height: 100%;
+  }
+
+  body {
+    min-height: 100dvh;
+  }
+
+  .app-shell {
+    min-height: 100dvh;
+  }
+
+  .app-main {
+    min-height: 100dvh;
+    padding: calc(12px + env(safe-area-inset-top, 0px)) 16px calc(88px + env(safe-area-inset-bottom, 0px));
+  }
+
+  .mobile-nav {
+    right: 10px;
+    bottom: calc(8px + env(safe-area-inset-bottom, 0px));
+    left: 10px;
+    padding: 5px;
+    border-color: rgba(255, 255, 255, 0.16);
+    border-radius: 20px;
+    background: rgba(23, 23, 25, 0.92);
+    box-shadow: 0 8px 28px rgba(0, 0, 0, 0.2);
+  }
+
+  .mobile-nav-item {
+    min-height: 52px;
+    border-radius: 15px;
+    font-size: 0.72rem;
+  }
+
+  .mobile-nav-item:active {
+    transform: scale(0.96);
+  }
+
+  .page,
+  .growth-page,
+  .practice-page {
+    width: 100%;
+    max-width: none;
+  }
+
+  .practice-page {
+    height: calc(100dvh - 100px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px));
+    min-height: 440px;
+  }
+
+  .practice-workspace {
+    display: flex;
+    min-height: 0;
+    flex: 1;
+  }
+
+  .practice-main {
+    display: flex;
+    min-width: 0;
+    flex: 1;
+  }
+
+  .feedback-sidebar {
+    display: none;
+  }
+
+  .topic-strip {
+    flex: 0 0 auto;
+    gap: 10px;
+    margin-bottom: 8px;
+    padding: 12px 14px;
+    border-radius: 18px;
+  }
+
+  .topic-strip-actions {
+    gap: 6px;
+  }
+
+  .topic-strip-actions .secondary-button,
+  .topic-strip-actions .bilingual-toggle,
+  .topic-strip-actions .tts-toggle,
+  .phone-mode-btn {
+    min-height: 40px;
+  }
+
+  .chat-card {
+    min-height: 0;
+    border-radius: 20px;
+  }
+
+  .chat-thread {
+    min-height: 0;
+  }
+
+  .chat-scroll {
+    min-height: 0;
+    padding: 16px 14px;
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .chat-composer {
+    flex: 0 0 auto;
+    padding: 10px 12px calc(10px + env(safe-area-inset-bottom, 0px));
+  }
+
+  .chat-composer textarea {
+    min-height: 52px;
+    max-height: 120px;
+    resize: none;
+  }
+
+  .composer-toolbar {
+    align-items: center;
+  }
+
+  .composer-toolbar .primary-button {
+    width: auto;
+    min-width: 92px;
+    height: 44px;
+    flex: 0 0 auto;
+  }
+
+  .onboarding-page {
+    min-height: 100dvh;
+    align-items: start;
+    padding: calc(12px + env(safe-area-inset-top, 0px)) 14px calc(20px + env(safe-area-inset-bottom, 0px));
+  }
+
+  .hero-panel,
+  .setup-form,
+  .card,
+  .growth-card,
+  .plan-card,
+  .scenario-tile {
+    border-radius: 18px;
+  }
+
+  .hero-panel h1 {
+    font-size: clamp(2.8rem, 16vw, 4.5rem);
+  }
+
+  .field input,
+  .field select,
+  .field textarea,
+  .composer textarea,
+  .chat-composer textarea {
+    min-height: 48px;
+    padding: 12px 14px;
+    font-size: 16px;
+  }
+
+  .field textarea,
+  .composer textarea,
+  .chat-composer textarea {
+    min-height: 72px;
+  }
+
+  .primary-button,
+  .secondary-button,
+  .ghost-danger-button,
+  .scenario-filter select,
+  .settings-goal-actions button {
+    min-height: 44px;
+  }
+
+  .scenario-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+  }
+
+  .scenario-tile-media {
+    height: 110px;
+  }
+}
+
+@media (max-width: 600px) {
+  .app-main {
+    padding-right: 12px;
+    padding-left: 12px;
+  }
+
+  .page {
+    gap: 14px;
+  }
+
+  .page-header h1 {
+    font-size: 1.7rem;
+    line-height: 1.18;
+  }
+
+  .page-header p,
+  .muted {
+    line-height: 1.5;
+  }
+
+  .today-hero {
+    min-height: 240px;
+    padding: 20px;
+    border-radius: 20px;
+  }
+
+  .today-hero h1 {
+    font-size: 2.2rem;
+    line-height: 1.08;
+  }
+
+  .card,
+  .growth-card,
+  .plan-card {
+    padding: 15px;
+  }
+
+  .practice-page {
+    height: calc(100dvh - 96px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px));
+    min-height: 420px;
+  }
+
+  .scenario-picker {
+    max-height: 26dvh;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .scenario-card-list {
+    grid-template-columns: 1fr;
+  }
+
+  .topic-strip {
+    display: flex;
+    align-items: flex-start;
+  }
+
+  .topic-strip > div:first-child {
+    min-width: 0;
+    flex: 1;
+  }
+
+  .topic-strip h1 {
+    font-size: 1.08rem;
+    line-height: 1.25;
+  }
+
+  .topic-strip-context {
+    display: -webkit-box;
+    overflow: hidden;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+  }
+
+  .topic-strip-actions {
+    max-width: 45%;
+  }
+
+  .topic-strip-actions .secondary-button,
+  .topic-strip-actions .bilingual-toggle,
+  .topic-strip-actions .tts-toggle,
+  .topic-strip-actions .phone-mode-btn {
+    flex: 0 0 auto;
+    padding-inline: 10px;
+  }
+
+  .session-dot {
+    width: 100%;
+  }
+
+  .chat-scroll {
+    padding: 14px 10px;
+  }
+
+  .message-avatar {
+    width: 26px;
+    height: 26px;
+  }
+
+  .message-bubble {
+    max-width: calc(100% - 42px);
+    padding: 11px 12px;
+    overflow-wrap: anywhere;
+  }
+
+  .message-action-button {
+    width: 36px;
+    height: 36px;
+  }
+
+  .chat-composer {
+    gap: 8px;
+    padding: 8px 10px calc(8px + env(safe-area-inset-bottom, 0px));
+  }
+
+  .voice-recorder {
+    display: flex;
+    flex: 1 1 auto;
+    flex-wrap: wrap;
+    min-width: 0;
+  }
+
+  .voice-recorder button {
+    min-height: 44px;
+  }
+
+  .composer-toolbar .primary-button {
+    min-width: 76px;
+    padding-inline: 12px;
+  }
+
+  .feedback-sidebar {
+    display: none;
+  }
+
+  .settings-goal-card {
+    gap: 12px;
+    padding: 14px;
+  }
+
+  .settings-summary-list div {
+    align-items: flex-start;
+  }
+
+  .settings-summary-list strong {
+    overflow-wrap: anywhere;
+  }
+
+  .scenario-grid {
+    gap: 8px;
+  }
+
+  .scenario-tile {
+    min-width: 0;
+  }
+
+  .scenario-tile-media {
+    height: 88px;
+  }
+
+  .scenario-tile-body {
+    padding: 10px;
+  }
+
+  .settings-card-header,
+  .settings-advanced-header {
+    gap: 10px;
+  }
+}
+
+@media (max-width: 380px) {
+  .scenario-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .topic-strip {
+    display: grid;
+  }
+
+  .topic-strip-actions {
+    max-width: 100%;
+    justify-content: flex-start;
+  }
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  .mobile-nav {
+    background: var(--nav);
+    backdrop-filter: none;
+  }
+}
+
+
+/* ==========================================================================
+   设备预览壳（电脑 ⇄ 手机布局切换）
+   只在最外层页面出现；手机模式用 iframe 承载同一应用，@media 断点真实命中
+   ========================================================================== */
+.device-stage {
+  display: grid;
+  min-height: 100vh;
+  padding: 26px 16px;
+  place-content: center;
+  gap: 12px;
+  background: radial-gradient(circle at 50% 0%, #1c2230 0%, #0d0f14 60%);
+}
+
+.device-shell {
+  position: relative;
+  width: 390px;
+  height: min(844px, calc(100vh - 132px));
+  padding: 11px;
+  border-radius: 46px;
+  background: #0b0c10;
+  box-shadow: 0 34px 90px rgba(0, 0, 0, 0.6), inset 0 0 0 2px rgba(255, 255, 255, 0.08);
+}
+
+.device-notch {
+  position: absolute;
+  top: 20px;
+  left: 50%;
+  z-index: 2;
+  width: 112px;
+  height: 26px;
+  border-radius: 999px;
+  background: #0b0c10;
+  transform: translateX(-50%);
+}
+
+.device-screen {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border: 0;
+  border-radius: 36px;
+  background: #fff;
+}
+
+.device-caption {
+  margin: 0;
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 0.76rem;
+  text-align: center;
+}
+
+.device-toggle {
+  position: fixed;
+  right: 18px;
+  bottom: 18px;
+  z-index: 9000;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 15px;
+  border: 0;
+  border-radius: 999px;
+  background: #151517;
+  color: #fff;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.28);
+  transition: transform 0.15s ease, background 0.15s ease;
+}
+
+.device-toggle:hover {
+  transform: translateY(-1px);
+}
+
+.device-toggle-on {
+  background: #2b67f6;
+}
+
+.device-toggle-icon {
+  font-size: 0.95rem;
+  line-height: 1;
+}
+
+/* ==========================================================================
+   手机端 AI 对话界面
+   ========================================================================== */
+.m-chat-top,
+.m-feedback-fab,
+.m-sheet-backdrop {
+  display: none;
+}
+
+@media (max-width: 600px) {
+  /* ---------- 顶部：左圆钮（菜单） + 右胶囊（朗读 / 新建会话） ---------- */
+  .m-chat-top {
+    display: flex;
+    flex: 0 0 auto;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 4px 16px 0;
+  }
+
+  .m-circle-btn {
+    display: grid;
+    width: 44px;
+    height: 44px;
+    place-items: center;
+    border: 0;
+    border-radius: 50%;
+    background: #fff;
+    box-shadow: 0 6px 18px rgba(20, 33, 61, 0.08);
+    cursor: pointer;
+  }
+
+  .m-burger {
+    display: grid;
+    gap: 5px;
+    width: 18px;
+  }
+
+  .m-burger i {
+    display: block;
+    height: 2px;
+    border-radius: 2px;
+    background: #151517;
+  }
+
+  .m-burger i:first-child { width: 18px; }
+  .m-burger i:last-child { width: 12px; }
+
+  .m-pill {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    padding: 4px;
+    border-radius: 999px;
+    background: #fff;
+    box-shadow: 0 6px 18px rgba(20, 33, 61, 0.08);
+  }
+
+  .m-pill-btn {
+    display: grid;
+    width: 40px;
+    height: 34px;
+    place-items: center;
+    border: 0;
+    border-radius: 999px;
+    background: transparent;
+    color: #151517;
+    font-size: 1rem;
+    line-height: 1;
+    cursor: pointer;
+  }
+
+  .m-pill-btn:disabled { opacity: 0.45; }
+
+  .m-pill-btn-strong {
+    font-size: 1.2rem;
+    font-weight: 700;
+  }
+
+  .m-pill-sep {
+    width: 1px;
+    height: 16px;
+    background: #e9ebf0;
+  }
+
+  /* ---------- 场景标题：收敛成两行小字，去掉大色块与按钮条 ---------- */
+  .topic-strip,
+  .topic-strip.topic-strip-cover {
+    display: block;
+    margin: 2px 0 4px;
+    padding: 2px 20px 8px;
+    border: 0;
+    border-radius: 0;
+    background: transparent !important;
+    background-image: none !important;
+    box-shadow: none;
+    text-align: center;
+  }
+
+  .topic-strip h1 {
+    margin: 2px 0 3px;
+    font-size: 1.1rem;
+    line-height: 1.3;
+  }
+
+  .topic-strip > div:first-child p {
+    margin: 0;
+    color: #9a9ba2;
+    font-size: 0.7rem;
+  }
+
+  .topic-strip-context,
+  .session-dot,
+  .topic-strip-actions {
+    display: none !important;
+  }
+
+  /* ---------- 对话区：去掉卡片描边，融进白底 ---------- */
+  .chat-card {
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    box-shadow: none;
+  }
+
+  .chat-thread {
+    background: transparent;
+  }
+
+  .chat-scroll {
+    padding: 4px 14px 10px;
+  }
+
+  /* ---------- 输入卡：一个大圆角卡片，内部两行 ---------- */
+  .chat-composer,
+  .chat-composer-mobile {
+    display: flex;
+    flex: 0 0 auto;
+    flex-direction: column;
+    gap: 8px;
+    margin: 0 12px 8px;
+    padding: 12px 14px calc(12px + env(safe-area-inset-bottom, 0px));
+    border: 0;
+    border-radius: 26px;
+    background: #fff;
+    box-shadow: 0 10px 30px rgba(20, 33, 61, 0.1);
+  }
+
+  .chat-composer textarea,
+  .chat-composer-mobile textarea {
+    min-height: 38px;
+    max-height: 120px;
+    padding: 0 2px;
+    border: 0;
+    background: transparent;
+    font-size: 1rem;
+    line-height: 1.5;
+    resize: none;
+  }
+
+  .chat-composer textarea:focus,
+  .chat-composer-mobile textarea:focus {
+    outline: none;
+    box-shadow: none;
+  }
+
+  /* ---------- 输入卡第二行：左侧胶囊 chip + 右侧圆形麦克风 ---------- */
+  .m-composer-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .m-chips {
+    display: flex;
+    flex: 1 1 auto;
+    gap: 8px;
+    min-width: 0;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+
+  .m-chips::-webkit-scrollbar { display: none; }
+
+  .m-chip {
+    display: inline-flex;
+    flex: 0 0 auto;
+    align-items: center;
+    gap: 6px;
+    height: 34px;
+    padding: 0 14px;
+    border: 0;
+    border-radius: 999px;
+    background: #f2f4f8;
+    color: #3d4453;
+    font-size: 0.82rem;
+    white-space: nowrap;
+    cursor: pointer;
+  }
+
+  .m-chip-on {
+    background: rgba(43, 103, 246, 0.1);
+    color: #2b67f6;
+  }
+
+  .m-chip-icon {
+    font-size: 0.9rem;
+    line-height: 1;
+  }
+
+  /* 把 VoiceRecorder 收成一个圆形按钮 */
+  .m-composer-actions .voice-recorder {
+    display: flex;
+    flex: 0 0 auto;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .m-composer-actions .voice-drop-zone {
+    display: flex;
+    align-items: center;
+    padding: 0;
+    border: 0;
+    background: transparent;
+  }
+
+  .m-composer-actions .voice-hold-button {
+    display: grid;
+    width: 46px;
+    height: 46px;
+    min-height: 46px;
+    padding: 0;
+    place-items: center;
+    border: 0;
+    border-radius: 50%;
+    background: #151517;
+    color: #fff;
+  }
+
+  .m-composer-actions .voice-hold-button > span { display: none; }
+
+  .m-composer-actions .voice-hold-button::before {
+    content: "🎤";
+    font-size: 1.15rem;
+    line-height: 1;
+  }
+
+  .m-composer-actions .voice-hold-button-active {
+    background: #f04438;
+  }
+
+  .m-composer-actions .voice-hold-button-active::before {
+    content: "■";
+    font-size: 0.95rem;
+  }
+
+  .m-composer-actions .voice-transcribe-button,
+  .m-composer-actions .voice-file-button,
+  .m-composer-actions .voice-drop-hint,
+  .m-composer-actions .voice-waveform {
+    display: none;
+  }
+
+  .m-composer-actions .voice-waveform-active {
+    display: flex;
+    height: 20px;
+  }
+
+  .m-composer-actions .voice-hint,
+  .m-composer-actions .voice-recorder-error {
+    font-size: 0.72rem;
+  }
+
+  /* ---------- 纠错：右下角浮动入口 + 底部抽屉 ---------- */
+  .m-feedback-fab {
+    position: fixed;
+    right: 16px;
+    bottom: calc(104px + env(safe-area-inset-bottom, 0px));
+    z-index: 40;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    height: 38px;
+    padding: 0 14px;
+    border: 0;
+    border-radius: 999px;
+    background: #151517;
+    color: #fff;
+    font-size: 0.8rem;
+    cursor: pointer;
+    box-shadow: 0 10px 24px rgba(0, 0, 0, 0.22);
+  }
+
+  .m-feedback-fab-on { background: #2b67f6; }
+
+  .m-feedback-count {
+    display: inline-grid;
+    min-width: 18px;
+    height: 18px;
+    padding: 0 4px;
+    place-items: center;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.22);
+    font-size: 0.66rem;
+  }
+
+  /* ---------- 通用底部抽屉（菜单 / 纠错） ---------- */
+  .m-sheet-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 70;
+    display: flex;
+    align-items: flex-end;
+    background: rgba(16, 24, 39, 0.32);
+  }
+
+  .m-sheet {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    max-height: 78dvh;
+    border-radius: 22px 22px 0 0;
+    background: #fff;
+    box-shadow: 0 -18px 48px rgba(16, 24, 39, 0.18);
+    animation: m-sheet-in 0.2s ease-out;
+  }
+
+  @keyframes m-sheet-in {
+    from { opacity: 0.5; transform: translateY(16px); }
+    to { opacity: 1; transform: none; }
+  }
+
+  .m-sheet-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 18px 10px;
+    border-bottom: 1px solid #eef0f4;
+  }
+
+  .m-sheet-head strong { font-size: 0.95rem; }
+
+  .m-sheet-close {
+    padding: 6px 8px;
+    border: 0;
+    background: transparent;
+    color: #7a7c85;
+    font-size: 0.82rem;
+    cursor: pointer;
+  }
+
+  .m-sheet-body {
+    display: grid;
+    gap: 8px;
+    padding: 14px 16px calc(20px + env(safe-area-inset-bottom, 0px));
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+
+  .m-sheet-item {
+    display: flex;
+    align-items: center;
+    min-height: 48px;
+    padding: 0 16px;
+    border: 0;
+    border-radius: 14px;
+    background: #f5f6f9;
+    color: #151517;
+    font-size: 0.94rem;
+    text-align: left;
+    cursor: pointer;
+  }
+
+  .m-sheet-item:disabled { opacity: 0.5; }
+
+  .m-sheet-item-danger {
+    background: #fef3f2;
+    color: #d92d20;
+  }
+}
+
+
+/* ==========================================================================
+   第二轮调整：场景栏去图 / 手机端溢出防护 / 输入卡变矮 / 精简页面
+   ========================================================================== */
+
+/* ---------- 1. 当前场景：只留文字，半透明，去掉封面图 ---------- */
+.topic-strip {
+  background: transparent !important;
+  background-image: none !important;
+  border: 0 !important;
+  box-shadow: none !important;
+}
+
+.topic-strip > div:first-child {
+  opacity: 0.55;
+}
+
+.topic-strip h1 {
+  margin: 2px 0 2px;
+  font-size: 1.1rem;
+}
+
+.topic-strip-context {
+  display: none;
+}
+
+/* ---------- 手机端 ---------- */
+@media (max-width: 600px) {
+  html,
+  body {
+    overflow-x: hidden;
+  }
+
+  .app-main {
+    padding-right: 10px;
+    padding-left: 10px;
+  }
+
+  .practice-page,
+  .practice-workspace,
+  .practice-main,
+  .chat-card,
+  .chat-thread,
+  .chat-scroll,
+  .m-chat-top {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+  }
+
+  .topic-strip {
+    text-align: center;
+    padding: 2px 12px 6px;
+  }
+
+  .message-bubble {
+    max-width: calc(100vw - 86px);
+  }
+
+  .m-pill,
+  .m-circle-btn,
+  .m-plus-btn {
+    flex: 0 0 auto;
+  }
+
+  /* ---------- 输入卡：更矮 ---------- */
+  .chat-composer,
+  .chat-composer-mobile {
+    gap: 6px;
+    margin: 0 10px 6px;
+    padding: 9px 12px calc(9px + env(safe-area-inset-bottom, 0px));
+    border-radius: 22px;
+  }
+
+  .chat-composer textarea,
+  .chat-composer-mobile textarea {
+    min-height: 28px;
+    max-height: 92px;
+    font-size: 0.95rem;
+    line-height: 1.45;
+  }
+
+  .m-chip {
+    height: 30px;
+    padding: 0 12px;
+    font-size: 0.78rem;
+  }
+
+  /* ---------- 加号：接替原麦克风位置 ---------- */
+  .m-plus-btn {
+    display: grid;
+    width: 40px;
+    height: 40px;
+    place-items: center;
+    border: 0;
+    border-radius: 50%;
+    background: #151517;
+    color: #fff;
+    font-size: 1.1rem;
+    line-height: 1;
+    cursor: pointer;
+  }
+
+  /* 录音器保留挂载（长按用合成事件驱动），但视觉隐藏 */
+  .m-voice-hidden {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    opacity: 0;
+    pointer-events: none;
+  }
+
+  .m-feedback-fab {
+    bottom: calc(92px + env(safe-area-inset-bottom, 0px));
+  }
+
+  /* ---------- 3a. 场景选择页：只留 图 + 名称 + 类别/等级 ---------- */
+  .scenario-card {
+    gap: 3px;
+    padding: 10px 12px;
+  }
+
+  .scenario-card-media {
+    height: 54px;
+  }
+
+  .scenario-card strong {
+    font-size: 0.95rem;
+  }
+
+  .scenario-card-desc,
+  .scenario-card-role {
+    display: none;
+  }
+
+  .scenario-picker {
+    max-height: 30dvh;
+  }
+
+  /* ---------- 3b. 开口前提示页：精简为 2 块 + 3 条表达 ---------- */
+  .lesson-brief-card-steps {
+    display: none;
+  }
+
+  .lesson-brief-grid {
+    gap: 8px;
+  }
+
+  .lesson-brief-card {
+    padding: 10px 12px;
+  }
+
+  .lesson-brief-card p {
+    display: -webkit-box;
+    overflow: hidden;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 3;
+  }
+
+  .lesson-expression-list li:nth-child(n + 4) {
+    display: none;
+  }
+
+  .lesson-brief-header h1 {
+    font-size: 1.15rem;
+  }
+
+  .lesson-brief-header > p {
+    display: -webkit-box;
+    overflow: hidden;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+  }
+}
+
+/* ---------- 最近对话列表（抽屉内） ---------- */
+.m-history-item {
+  display: grid;
+  gap: 4px;
+  padding: 11px 13px;
+  border-radius: 14px;
+  background: #f5f6f9;
+}
+
+.m-history-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.m-history-head strong {
+  font-size: 0.92rem;
+}
+
+.m-history-score {
+  flex: 0 0 auto;
+  color: #2b67f6;
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.m-history-summary {
+  margin: 0;
+  color: #4b5160;
+  font-size: 0.82rem;
+  line-height: 1.45;
+}
+
+.m-history-meta {
+  margin: 0;
+  color: #9a9ba2;
+  font-size: 0.72rem;
+}
+
+.m-sheet-empty {
+  margin: 0;
+  color: #8a8c95;
+  font-size: 0.85rem;
+}
+
+
+/* ==========================================================================
+   统一设计语言：白卡无描边、圆角 18-20、极淡阴影；列表行 = 左标签 + 右值 + ›
+   ========================================================================== */
+:root {
+  --ui-bg: #f5f6f7;
+  --ui-card: #ffffff;
+  --ui-ink: #151517;
+  --ui-sub: #8a8c95;
+  --ui-line: #eff0f3;
+  --ui-blue: #2b67f6;
+  --ui-orange: #f79009;
+  --ui-radius: 20px;
+  --ui-shadow: 0 2px 10px rgba(20, 33, 61, 0.05);
+}
+
+/* ---------- 场景卡：去掉缩略图，改成「标题 + 类别·等级」双列小卡 ---------- */
+.scenario-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+  gap: 14px;
+}
+
+.scenario-card {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 14px 16px;
+  border: 0;
+  border-radius: 18px;
+  background: var(--ui-card);
+  box-shadow: var(--ui-shadow);
+  text-align: left;
+  cursor: pointer;
+}
+
+.scenario-card-active {
+  box-shadow: 0 0 0 2px var(--ui-blue) inset;
+}
+
+.scenario-card strong {
+  color: var(--ui-ink);
+  font-size: 1rem;
+  line-height: 1.35;
+}
+
+.scenario-card-index {
+  color: var(--ui-sub);
+  font-size: 0.74rem;
+}
+
+.scenario-card-role {
+  color: #5b6270;
+  font-size: 0.8rem;
+}
+
+.scenario-card-desc {
+  display: -webkit-box;
+  overflow: hidden;
+  color: #9a9ba2;
+  font-size: 0.76rem;
+  line-height: 1.45;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+/* ---------- 通用列表行（我的 / 设置 / 成长） ---------- */
+.m-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.m-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 52px;
+  padding: 0 2px;
+  border-bottom: 1px solid var(--ui-line);
+}
+
+.m-row:last-child {
+  border-bottom: 0;
+}
+
+.m-row-label {
+  color: var(--ui-ink);
+  font-size: 0.95rem;
+}
+
+.m-row-value {
+  color: var(--ui-sub);
+  font-size: 0.85rem;
+}
+
+.m-row-btn {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 52px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+}
+
+.m-row-chevron {
+  color: #c3c5cc;
+  font-size: 1.1rem;
+  line-height: 1;
+}
+
+/* ---------- 我的：顶部分段控件 ---------- */
+.m-profile-head {
+  display: grid;
+  gap: 8px;
+  justify-items: center;
+  padding: 6px 0 14px;
+}
+
+.m-seg {
+  display: inline-flex;
+  padding: 3px;
+  border-radius: 999px;
+  background: #eceef1;
+}
+
+.m-seg-item {
+  padding: 7px 20px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: #6b6f78;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.m-seg-item-on {
+  background: #fff;
+  color: var(--ui-ink);
+  box-shadow: 0 1px 4px rgba(20, 33, 61, 0.1);
+}
+
+.m-profile-sub {
+  margin: 0;
+  color: var(--ui-sub);
+  font-size: 0.78rem;
+}
+
+/* ---------- 成长：四宫格 ---------- */
+.m-stat-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+  margin-bottom: 14px;
+  padding: 14px 12px;
+  border-radius: var(--ui-radius);
+  background: var(--ui-card);
+  box-shadow: var(--ui-shadow);
+}
+
+.m-stat {
+  display: grid;
+  gap: 2px;
+  justify-items: center;
+}
+
+.m-stat strong {
+  color: var(--ui-ink);
+  font-size: 1.35rem;
+  line-height: 1.1;
+}
+
+.m-stat span {
+  color: var(--ui-sub);
+  font-size: 0.72rem;
+}
+
+/* ---------- 提示页：底部固定操作条 ---------- */
+.m-brief-bar {
+  position: fixed;
+  right: 0;
+  bottom: calc(74px + env(safe-area-inset-bottom, 0px));
+  left: 0;
+  z-index: 55;
+  padding: 10px 14px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0), #fff 38%);
+}
+
+.m-brief-bar .primary-button {
+  width: 100%;
+  height: 46px;
+  border-radius: 999px;
+  font-size: 0.95rem;
+}
+
+/* ---------- 手机端 ---------- */
+@media (max-width: 600px) {
+  .scenario-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+  }
+
+  .scenario-card {
+    padding: 12px 13px;
+  }
+
+  .scenario-card strong {
+    font-size: 0.95rem;
+  }
+
+  /* 底部导航：3 个 tab */
+  .mobile-nav {
+    grid-template-columns: repeat(3, 1fr) !important;
+  }
+
+  /* 提示页：给固定条留出空间 */
+  .lesson-brief-shell {
+    padding-bottom: 96px;
+  }
+
+  .m-stat-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px 8px;
+  }
+
+  /* 我的 / 设置 卡片内边距收紧 */
+  .profile-card {
+    padding: 12px 14px;
+    border: 0;
+    box-shadow: var(--ui-shadow);
+  }
+}
+
+
+/* ==========================================================================
+   第四轮调整
+   ========================================================================== */
+
+/* ---------- 全局返回键 ---------- */
+.app-back-btn {
+  position: fixed;
+  top: 14px;
+  left: 14px;
+  z-index: 8000;
+  display: grid;
+  width: 38px;
+  height: 38px;
+  place-items: center;
+  border: 0;
+  border-radius: 50%;
+  background: #fff;
+  color: #151517;
+  font-size: 1.05rem;
+  line-height: 1;
+  cursor: pointer;
+  box-shadow: 0 4px 14px rgba(20, 33, 61, 0.12);
+}
+
+/* ---------- 长按录音浮层 ---------- */
+.m-rec-overlay {
+  position: fixed;
+  bottom: calc(118px + env(safe-area-inset-bottom, 0px));
+  left: 50%;
+  z-index: 65;
+  display: grid;
+  gap: 3px;
+  justify-items: center;
+  padding: 12px 24px;
+  border-radius: 18px;
+  background: rgba(21, 21, 23, 0.92);
+  color: #fff;
+  transform: translateX(-50%);
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.25);
+}
+
+.m-rec-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #f04438;
+  animation: m-rec-blink 1s ease-in-out infinite;
+}
+
+@keyframes m-rec-blink {
+  50% { opacity: 0.25; }
+}
+
+.m-rec-text {
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.m-rec-hint {
+  font-size: 0.7rem;
+  opacity: 0.7;
+}
+
+/* ---------- 场景卡：只留中文名 + 等级 ---------- */
+.scenario-card-level {
+  color: var(--ui-sub);
+  font-size: 0.72rem;
+}
+
+/* ---------- 提示页：表达板块可折叠 ---------- */
+.lesson-collapse-head {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+}
+
+.lesson-collapse-toggle {
+  flex: 0 0 auto;
+  color: #2b67f6;
+  font-size: 0.78rem;
+}
+
+/* ---------- 手机端 ---------- */
+@media (max-width: 600px) {
+  /* 纠错悬浮窗挪到左侧，避免挡住输入卡右侧的加号 */
+  .m-feedback-fab {
+    right: auto;
+    left: 14px;
+    bottom: calc(96px + env(safe-area-inset-bottom, 0px));
+  }
+
+  /* 提示页：整体收进一屏，内容区内部滚动 */
+  .lesson-brief-shell {
+    display: block;
+    max-height: calc(100dvh - 200px);
+    overflow-y: auto;
+    padding: 2px 2px 10px;
+    border-radius: 0;
+    background: transparent;
+    box-shadow: none;
+    overscroll-behavior: contain;
+  }
+
+  .lesson-brief-header {
+    display: block;
+    padding: 0 4px 10px;
+  }
+
+  .lesson-brief-header h1 {
+    margin: 4px 0 6px;
+    font-size: 1.2rem;
+    line-height: 1.3;
+  }
+
+  .lesson-brief-header > p {
+    display: -webkit-box;
+    overflow: hidden;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+  }
+
+  .lesson-brief-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+
+  .lesson-brief-card {
+    padding: 12px 14px;
+    border-radius: 16px;
+    background: #fff;
+    box-shadow: var(--ui-shadow);
+  }
+
+  .lesson-brief-card p {
+    -webkit-line-clamp: 4;
+  }
+}
+
+
+/* ==========================================================================
+   第五轮调整
+   ========================================================================== */
+
+/* ---------- 我的：列表行右侧「数值 + ›」 ---------- */
+.m-row-right {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 8px;
+}
+
+/* 详情子页头部 */
+.profile-detail-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.profile-detail-back {
+  padding: 5px 10px;
+  border: 0;
+  border-radius: 999px;
+  background: #f2f4f8;
+  color: #3d4453;
+  font-size: 0.8rem;
+  cursor: pointer;
+}
+
+.profile-detail-head strong {
+  font-size: 0.95rem;
+}
+
+/* ---------- 场景卡：只留中文名 + 一句中文介绍 ---------- */
+.scenario-tile-media,
+.scenario-favorite-btn {
+  display: none;
+}
+
+.scenario-tile {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 14px 16px;
+  border: 0;
+  border-radius: 18px;
+  background: var(--ui-card);
+  box-shadow: var(--ui-shadow);
+  text-align: left;
+  cursor: pointer;
+}
+
+.scenario-tile strong {
+  color: var(--ui-ink);
+  font-size: 1rem;
+  line-height: 1.35;
+}
+
+.scenario-tile-meta {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.scenario-tile-role {
+  color: var(--ui-sub);
+  font-size: 0.74rem;
+}
+
+.scenario-tile-intro {
+  margin: 0;
+  color: #6b7280;
+  font-size: 0.8rem;
+  line-height: 1.5;
+}
+
+.scenario-tile-body > p:not(.scenario-tile-intro),
+.scenario-tile-body > small {
+  display: none;
+}
+
+/* ---------- 手机端：底部区域做半透明渐变，不遮挡对话 ---------- */
+@media (max-width: 600px) {
+  .chat-card {
+    position: relative;
+  }
+
+  /* 对话区底部淡出，最后一条消息不会被硬边切断 */
+  .chat-card::after {
+    position: absolute;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    height: 84px;
+    background: linear-gradient(180deg, rgba(247, 248, 250, 0) 0%, rgba(247, 248, 250, 0.86) 62%, #f7f8fa 100%);
+    pointer-events: none;
+    content: "";
+  }
+
+  /* 输入卡：半透明 + 模糊，背后的对话内容若隐若现 */
+  .chat-composer,
+  .chat-composer-mobile {
+    background: rgba(255, 255, 255, 0.74);
+    -webkit-backdrop-filter: blur(16px) saturate(160%);
+    backdrop-filter: blur(16px) saturate(160%);
+    box-shadow: 0 8px 26px rgba(20, 33, 61, 0.1);
+  }
+
+  /* 底部导航同样半透明 */
+  .mobile-nav {
+    background: rgba(255, 255, 255, 0.72);
+    -webkit-backdrop-filter: blur(18px) saturate(160%);
+    backdrop-filter: blur(18px) saturate(160%);
+  }
+
+  /* 场景页：两列紧凑卡 */
+  .scenario-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+  }
+
+  .scenario-tile {
+    padding: 12px 13px;
+  }
+
+  .scenario-tile-intro {
+    font-size: 0.76rem;
+  }
+}
+
+
+/* ==========================================================================
+   第六轮：场景页顶部不再「散」
+   ========================================================================== */
+
+/* 页头：标题收小、说明一行、随机按钮变胶囊 */
+.page-header {
+  padding-bottom: 10px;
+}
+
+.page-header h1 {
+  font-size: 1.35rem;
+  line-height: 1.25;
+}
+
+.page-header > div > p {
+  display: -webkit-box;
+  overflow: hidden;
+  color: var(--ui-sub);
+  font-size: 0.8rem;
+  line-height: 1.5;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.page-header .primary-button {
+  height: 36px;
+  padding: 0 18px;
+  border-radius: 999px;
+  font-size: 0.82rem;
+  white-space: nowrap;
+}
+
+/* 三个筛选：合并成一行胶囊，横向可滑动 */
+.scenario-filters {
+  display: flex;
+  gap: 8px;
+  margin: 4px 0 12px;
+  padding-bottom: 2px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.scenario-filters::-webkit-scrollbar {
+  display: none;
+}
+
+.scenario-filter {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 6px;
+  height: 36px;
+  padding: 0 12px;
+  border-radius: 999px;
+  background: #fff;
+  box-shadow: var(--ui-shadow);
+}
+
+.scenario-filter > span {
+  color: var(--ui-sub);
+  font-size: 0.75rem;
+  white-space: nowrap;
+}
+
+.scenario-filter select {
+  max-width: 120px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--ui-ink);
+  font-size: 0.84rem;
+  outline: none;
+}
+
+/* 学习路线块：与场景卡之间收紧 */
+.learning-path-block {
+  margin-bottom: 12px;
+}
+
+@media (max-width: 600px) {
+  .page-header h1 {
+    font-size: 1.25rem;
+  }
+
+  .scenario-filter select {
+    max-width: 92px;
+  }
+
+  .scenario-filter {
+    height: 34px;
+    padding: 0 10px;
+  }
+}
+
+/* 页头动作按钮不再拉满整行 */
+.page-header > .primary-button,
+.page-header > button {
+  justify-self: start;
+  align-self: start;
+}
+
+
+/* ==========================================================================
+   第七轮：渐变边界 = 输入卡上边界
+   —— 关掉对话区底部的遮罩，改成贴在输入卡上方的一条淡出带
+   ========================================================================== */
+@media (max-width: 600px) {
+  .chat-card::after {
+    display: none;
+  }
+
+  .chat-composer,
+  .chat-composer-mobile {
+    position: relative;
+  }
+
+  /* 紧贴输入卡上沿，从透明淡到卡片底色，最后一条消息在这里自然消失 */
+  .chat-composer::before,
+  .chat-composer-mobile::before {
+    position: absolute;
+    right: 0;
+    bottom: 100%;
+    left: 0;
+    height: 34px;
+    border-radius: 22px 22px 0 0;
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0) 0%, rgba(255, 255, 255, 0.92) 100%);
+    pointer-events: none;
+    content: "";
+  }
+}
+
+
+/* ==========================================================================
+   第八轮：主页面 / 图标导航 / 二级页隐藏导航
+   ========================================================================== */
+
+/* ---------- 主页面 ---------- */
+.home-page {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-height: calc(100vh - 120px);
+  padding: 26px 20px 20px;
+  border-radius: 26px;
+  background:
+    radial-gradient(120% 80% at 12% 0%, #f7cdd6 0%, rgba(247, 205, 214, 0) 55%),
+    radial-gradient(110% 75% at 88% 8%, #cfe0f5 0%, rgba(207, 224, 245, 0) 58%),
+    radial-gradient(120% 90% at 50% 100%, #cfe8e2 0%, rgba(207, 232, 226, 0) 60%),
+    linear-gradient(165deg, #eef1f6 0%, #e6ebf3 100%);
+  overflow: hidden;
+}
+
+.home-hero {
+  display: grid;
+  flex: 1;
+  place-content: center;
+  gap: 6px;
+  text-align: center;
+}
+
+.home-eyebrow {
+  margin: 0;
+  color: rgba(24, 30, 42, 0.55);
+  font-size: 0.76rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.home-title {
+  margin: 0;
+  color: #14171f;
+  font-size: clamp(34px, 10vw, 46px);
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  line-height: 1.05;
+}
+
+.home-sub {
+  margin: 2px 0 0;
+  color: rgba(24, 30, 42, 0.5);
+  font-size: 0.82rem;
+}
+
+.home-cards {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.home-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 6px;
+  min-height: 122px;
+  padding: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.62);
+  border-radius: 22px;
+  background: rgba(255, 255, 255, 0.42);
+  -webkit-backdrop-filter: blur(18px) saturate(170%);
+  backdrop-filter: blur(18px) saturate(170%);
+  box-shadow: 0 14px 34px rgba(31, 45, 61, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.7);
+  text-align: left;
+  cursor: pointer;
+}
+
+.home-card:active {
+  transform: scale(0.985);
+}
+
+.home-card-title {
+  color: #14171f;
+  font-size: 1.08rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.home-card-meta {
+  color: rgba(24, 30, 42, 0.56);
+  font-size: 0.8rem;
+  line-height: 1.4;
+}
+
+.home-card-badge {
+  position: absolute;
+  right: 14px;
+  bottom: 14px;
+  display: grid;
+  min-width: 26px;
+  height: 26px;
+  padding: 0 7px;
+  place-items: center;
+  border-radius: 999px;
+  background: rgba(20, 23, 31, 0.08);
+  color: #14171f;
+  font-size: 0.76rem;
+  font-weight: 600;
+}
+
+.home-card-badge-done {
+  background: #c5ff3c;
+}
+
+.home-browse {
+  align-self: center;
+  padding: 8px 18px;
+  border: 0;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.5);
+  color: rgba(20, 23, 31, 0.7);
+  font-size: 0.8rem;
+  cursor: pointer;
+}
+
+/* ---------- 底部图标导航 ---------- */
+.mobile-nav {
+  grid-template-columns: repeat(3, 1fr) !important;
+}
+
+.mobile-nav-icon {
+  display: grid;
+  place-items: center;
+  color: inherit;
+}
+
+.mobile-nav-item {
+  justify-items: center;
+  gap: 0;
+}
+
+.mobile-nav-item-active {
+  color: #14171f;
+}
+
+/* 二级页：隐去导航 */
+.mobile-nav-hidden {
+  display: none !important;
+}
+
+/* 二级页：不再为底部导航留空 */
+.app-shell-nonav .app-main {
+  padding-bottom: calc(20px + env(safe-area-inset-bottom, 0px));
+}
+
+@media (max-width: 600px) {
+  .home-page {
+    min-height: calc(100dvh - 150px);
+    padding: 20px 16px 16px;
+  }
+
+  .home-card {
+    min-height: 112px;
+    padding: 14px;
+    border-radius: 20px;
+  }
+
+  .home-card-title {
+    font-size: 1rem;
+  }
+
+  .app-shell-nonav .app-main {
+    padding-bottom: calc(14px + env(safe-area-inset-bottom, 0px));
+  }
+}
+
+/* 对话页的返回键挪到右上角，避开左上角的菜单键 */
+@media (max-width: 600px) {
+  .app-back-btn-chat {
+    top: 6px;
+    right: 14px;
+    left: auto;
+    width: 34px;
+    height: 34px;
+    background: rgba(255, 255, 255, 0.86);
+    box-shadow: 0 4px 14px rgba(20, 33, 61, 0.1);
+  }
+}
+
+/* 对话页返回键：放在顶部栏下方左侧，避免和菜单键、右上胶囊重叠 */
+@media (max-width: 600px) {
+  .app-back-btn-chat {
+    top: 54px;
+    right: auto;
+    left: 12px;
+    width: 30px;
+    height: 30px;
+    font-size: 0.9rem;
+  }
+}
+
+
+/* ==========================================================================
+   第九轮：对话框贴底 / 主页背景铺满 / 导航三块分开
+   ========================================================================== */
+@media (max-width: 600px) {
+  /* ---------- 1. 对话框贴到屏幕最底部 ---------- */
+  .app-shell-nonav .practice-page {
+    height: calc(100dvh - 8px - env(safe-area-inset-top, 0px));
+    padding-bottom: 0;
+  }
+
+  .chat-composer,
+  .chat-composer-mobile {
+    margin-bottom: max(4px, env(safe-area-inset-bottom, 0px));
+    border-bottom-left-radius: 22px;
+    border-bottom-right-radius: 22px;
+  }
+
+  /* 输入卡上方的淡出带保持贴住它的上沿 */
+  .chat-composer::before,
+  .chat-composer-mobile::before {
+    bottom: 100%;
+  }
+
+  /* ---------- 2. 主页背景铺满整屏 ---------- */
+  .app-main:has(.home-page) {
+    padding: 0;
+  }
+
+  .home-page {
+    min-height: 100dvh;
+    margin: 0;
+    padding: calc(28px + env(safe-area-inset-top, 0px)) 18px calc(96px + env(safe-area-inset-bottom, 0px));
+    border-radius: 0;
+  }
+
+  /* ---------- 3. 导航三块分开，不连成一条 ---------- */
+  .mobile-nav {
+    display: flex;
+    gap: 10px;
+    padding: 8px 14px calc(8px + env(safe-area-inset-bottom, 0px));
+    border: 0;
+    background: transparent;
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+    box-shadow: none;
+  }
+
+  .mobile-nav-item {
+    display: grid;
+    flex: 1 1 0;
+    height: 46px;
+    place-items: center;
+    border-radius: 16px;
+    background: rgba(255, 255, 255, 0.82);
+    color: #7b808a;
+    box-shadow: 0 6px 18px rgba(20, 33, 61, 0.08);
+  }
+
+  .mobile-nav-item-active {
+    background: #151517;
+    color: #fff;
+  }
+
+  .mobile-nav-icon svg {
+    width: 22px;
+    height: 22px;
+  }
+}
+
+
+/* ==========================================================================
+   第十轮
+   ========================================================================== */
+
+/* ---------- 1. 去掉对话区右侧滚动条 ---------- */
+.chat-scroll,
+.chat-thread,
+.feedback-list,
+.m-sheet-body {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.chat-scroll::-webkit-scrollbar,
+.chat-thread::-webkit-scrollbar,
+.feedback-list::-webkit-scrollbar,
+.m-sheet-body::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+  display: none;
+}
+
+/* ---------- 2. 纠错入口移到顶栏胶囊里（不再浮动挡输入框） ---------- */
+.m-pill-btn {
+  position: relative;
+}
+
+.m-pill-count {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  display: grid;
+  min-width: 15px;
+  height: 15px;
+  padding: 0 3px;
+  place-items: center;
+  border-radius: 999px;
+  background: #f04438;
+  color: #fff;
+  font-size: 0.6rem;
+  font-weight: 700;
+  line-height: 1;
+}
+
+/* ---------- 3. 最近对话：可点击 + 回放 ---------- */
+.m-history-item-btn {
+  display: grid;
+  width: 100%;
+  gap: 4px;
+  border: 0;
+  text-align: left;
+  cursor: pointer;
+  font: inherit;
+}
+
+.m-history-item-btn:active {
+  background: #eceef2;
+}
+
+.m-replay {
+  display: grid;
+  gap: 10px;
+  padding: 2px 0 6px;
+}
+
+.m-replay-line {
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: 14px;
+  background: #f2f4f8;
+  color: #1c2027;
+  font-size: 0.85rem;
+  line-height: 1.5;
+}
+
+.m-replay-line-user {
+  background: #e9f0ff;
+  margin-left: 18px;
+}
+
+.m-replay-who {
+  display: inline-block;
+  margin-right: 6px;
+  color: #8a8c95;
+  font-size: 0.7rem;
+  font-weight: 700;
+}
+
+/* ---------- 4. AI 第一句下方的「可以直接说」 ---------- */
+.chat-hint-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin: 6px 0 2px 46px;
+}
+
+.chat-hint-label {
+  color: #9a9ba2;
+  font-size: 0.7rem;
+}
+
+.chat-hint-chip {
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: #eef4ff;
+  color: #2b67f6;
+  font-size: 0.75rem;
+  font-style: normal;
+  line-height: 1.3;
+}
+
+
+/* ==========================================================================
+   第十一轮
+   ========================================================================== */
+
+/* ---------- 1. 「没有明确想法？」可收起 ---------- */
+.learning-path-toggle {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+}
+
+.learning-path-chevron {
+  flex: 0 0 auto;
+  color: #2b67f6;
+  font-size: 0.78rem;
+}
+
+.learning-path-intro {
+  margin: 6px 0 8px;
+}
+
+.learning-path-block {
+  padding: 12px 14px;
+  border-radius: var(--ui-radius);
+  background: var(--ui-card);
+  box-shadow: var(--ui-shadow);
+}
+
+/* ---------- 2. 实时纠错：可拖动悬浮窗 ---------- */
+.m-float {
+  position: fixed;
+  z-index: 70;
+  display: flex;
+  width: 264px;
+  max-height: 46vh;
+  flex-direction: column;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.94);
+  -webkit-backdrop-filter: blur(18px) saturate(170%);
+  backdrop-filter: blur(18px) saturate(170%);
+  box-shadow: 0 18px 46px rgba(20, 33, 61, 0.2), 0 0 0 1px rgba(20, 33, 61, 0.05);
+  overflow: hidden;
+  touch-action: none;
+}
+
+.m-float-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  border-bottom: 1px solid #eef0f3;
+  cursor: grab;
+  user-select: none;
+}
+
+.m-float-head:active {
+  cursor: grabbing;
+}
+
+.m-float-head strong {
+  flex: 1;
+  color: #151517;
+  font-size: 0.85rem;
+}
+
+.m-float-grip {
+  width: 16px;
+  height: 4px;
+  border-radius: 999px;
+  background: #d5d8de;
+}
+
+.m-float-close {
+  display: grid;
+  width: 22px;
+  height: 22px;
+  place-items: center;
+  border: 0;
+  border-radius: 50%;
+  background: #f1f2f5;
+  color: #6b6f78;
+  font-size: 0.7rem;
+  cursor: pointer;
+}
+
+.m-float-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 10px 12px 12px;
+  scrollbar-width: none;
+}
+
+.m-float-body::-webkit-scrollbar {
+  display: none;
+}
+
+/* ==========================================================================
+   第十二轮：去掉输入卡上方的淡出带 —— 分界线直接落在输入卡上边界
+   ========================================================================== */
+.chat-composer::before,
+.chat-composer-mobile::before {
+  display: none;
+  height: 0;
+}
+
+@media (max-width: 600px) {
+  /* 对话内容与输入卡之间只留一点呼吸，不再有遮住文字的渐变 */
+  .chat-scroll {
+    padding-bottom: 6px;
+  }
+
+  .chat-composer,
+  .chat-composer-mobile {
+    background: rgba(255, 255, 255, 0.9);
+    -webkit-backdrop-filter: blur(20px) saturate(170%);
+    backdrop-filter: blur(20px) saturate(170%);
+  }
+}
+
+/* ==========================================================================
+   第十三轮：对话内容贴底 —— 消除输入框上方那一大片空白
+   ========================================================================== */
+@media (max-width: 600px) {
+  .chat-scroll {
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* 内容不足一屏时整体下沉到底部；超出一屏时该规则自然失效，不影响滚动 */
+  .chat-scroll > :first-child {
+    margin-top: auto;
+  }
+}
+
+/* ==========================================================================
+   第十四轮：解除旧规则的限高 —— 这正是输入框上方大块空白的真正原因
+   .chat-scroll 曾被人写死 max-height: calc(100vh - 400px)，导致滚动区
+   只有约 440px 高，剩下的高度就成了空白。
+   ========================================================================== */
+@media (max-width: 600px) {
+  .chat-thread {
+    min-height: 0;
+  }
+
+  .chat-scroll {
+    flex: 1 1 auto;
+    max-height: none;
+    min-height: 0;
+  }
+}
+
+/* ==========================================================================
+   第十五轮：全局隐藏滚动条
+   ========================================================================== */
+* {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+*::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+  display: none;
+}
+
+
+/* ==========================================================================
+   第十六轮：全站统一成一个滚动容器（.app-main）
+   原先 .profile-layout / .scenario-picker 等各自 max-height + overflow，
+   滚轮落在这些“小盒子”里时如果它滚不动，事件就被吃掉，表现为整页滑不动。
+   ========================================================================== */
+.app-shell {
+  height: 100vh;
+  overflow: hidden;
+}
+
+.app-main {
+  height: 100vh;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+/* 拆掉嵌套的限高滚动盒，内容交给 .app-main 统一滚动 */
+.profile-layout {
+  max-height: none;
+  overflow: visible;
+  padding-right: 0;
+}
+
+.scenario-picker,
+.scenario-card-list {
+  max-height: none;
+  overflow: visible;
+}
+
+@media (max-width: 600px) {
+  .app-shell {
+    height: 100dvh;
+  }
+
+  .app-main {
+    height: 100dvh;
+  }
+}
+
+/* 录音错误提示（手机端） */
+.m-voice-toast {
+  position: fixed;
+  right: 14px;
+  bottom: calc(150px + env(safe-area-inset-bottom, 0px));
+  left: 14px;
+  z-index: 90;
+  padding: 10px 14px;
+  border-radius: 14px;
+  background: rgba(28, 32, 39, 0.92);
+  color: #fff;
+  font-size: 0.8rem;
+  line-height: 1.5;
+  text-align: center;
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.22);
+}
+
+/* 结束确认面板：替代 window.confirm，走页面内渲染 */
+.confirm-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 120;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(18, 20, 26, 0.42);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  animation: confirm-fade 160ms ease-out;
+}
+
+.confirm-card {
+  width: min(360px, 100%);
+  padding: 22px 20px 18px;
+  border-radius: 20px;
+  background: #fff;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.2);
+  animation: confirm-rise 200ms cubic-bezier(0.2, 0.9, 0.3, 1);
+}
+
+.confirm-title {
+  margin: 0 0 10px;
+  font-size: 1.05rem;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+  color: #1c2027;
+}
+
+.confirm-text {
+  margin: 0 0 18px;
+  font-size: 0.86rem;
+  line-height: 1.6;
+  color: #5b6270;
+}
+
+.confirm-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.confirm-btn {
+  width: 100%;
+  padding: 12px 16px;
+  border: 0;
+  border-radius: 13px;
+  font-size: 0.88rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: transform 120ms ease, opacity 120ms ease;
+}
+
+.confirm-btn:active { transform: scale(0.985); }
+.confirm-btn:disabled { opacity: 0.55; cursor: default; }
+
+.confirm-btn-primary {
+  background: #1c2027;
+  color: #fff;
+}
+
+.confirm-btn-ghost {
+  background: #f1f2f5;
+  color: #3d434e;
+}
+
+@keyframes confirm-fade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes confirm-rise {
+  from { opacity: 0; transform: translateY(10px) scale(0.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+/* 移动端：确认面板贴底显示，更符合拇指操作 */
+@media (max-width: 600px) {
+  .confirm-overlay {
+    align-items: flex-end;
+    padding: 0;
+  }
+
+  .confirm-card {
+    width: 100%;
+    max-width: 100%;
+    padding: 22px 20px calc(20px + env(safe-area-inset-bottom, 0px));
+    border-radius: 22px 22px 0 0;
+    animation: confirm-sheet 220ms cubic-bezier(0.2, 0.9, 0.3, 1);
+  }
+
+  .confirm-title { font-size: 1.1rem; }
+  .confirm-text { font-size: 0.85rem; }
+}
+
+@keyframes confirm-sheet {
+  from { opacity: 0; transform: translateY(100%); }
+  to { opacity: 1; transform: translateY(0); }
+}

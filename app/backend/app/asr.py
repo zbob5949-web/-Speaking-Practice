@@ -1,9 +1,11 @@
-"""本地 ASR：基于 sherpa-onnx 的英文语音识别（免 key、离线）。
+"""本地 ASR：基于 sherpa-onnx 的语音识别（免 key、离线）。
 
 - 模型目录由环境变量 ASR_MODEL_DIR 指定，默认 <项目根>/data/asr_model/ 下优先 whisper 模型
 - 音频解码用 miniaudio（支持 MP3/WAV/OGG → 16kHz 单声道 float32）
 - 识别前做音量归一化（小音量放大），提升小声说话的识别率
 - 支持三种模型形态：流式 zipformer（OnlineRecognizer）、非流式 zipformer（OfflineRecognizer）、whisper（OfflineRecognizer）
+- whisper 的识别语言由 ASR_LANGUAGE 控制：默认 zh（练习场景用户常用中文求助），
+  设成 auto 让模型自行判断，设成 en 则固定英文
 """
 import os
 from pathlib import Path
@@ -31,14 +33,15 @@ def _default_model_dir() -> Path:
     candidates = [child for child in sorted(base.iterdir()) if child.is_dir() and list(child.glob("*.onnx"))]
     if not candidates:
         return base
-    # whisper 优先（对整句文件识别质量最好），其次非流式 zipformer，最后任意
+    # 多语种 whisper 优先（能同时识别中英文），其次英文 whisper，
+    # 然后非流式 zipformer，最后任意
     def rank(child: Path) -> int:
         name = child.name.lower()
         if "whisper" in name:
-            return 0
+            return 1 if name.endswith(".en") or "-en" in name else 0
         if "streaming" not in name:
-            return 1
-        return 2
+            return 2
+        return 3
     return min(candidates, key=rank)
 
 
@@ -100,14 +103,20 @@ class AsrEngine:
             )
         if encoder and decoder:
             # whisper 模型（固定 16kHz，无需 sample_rate）
-            return sherpa_onnx.OfflineRecognizer.from_whisper(
+            # language 必须显式给出：多语种权重缺省会偏向英文，
+            # 中文音频不指定 language 时会输出英文幻觉（实测「你好」→ "You're all."）。
+            language = os.getenv("ASR_LANGUAGE", "").strip() or "en"
+            kwargs = dict(
                 tokens=str(tokens),
                 encoder=str(encoder),
                 decoder=str(decoder),
                 num_threads=2,
-                language="en",
                 task="transcribe",
             )
+            # 仅当显式指定语言时才传：留空让 sherpa 走自动检测
+            if language.lower() != "auto":
+                kwargs["language"] = language
+            return sherpa_onnx.OfflineRecognizer.from_whisper(**kwargs)
         raise RuntimeError(f"无法识别模型形态: {sorted(files)}")
 
     def transcribe_audio(self, audio_bytes: bytes) -> dict:

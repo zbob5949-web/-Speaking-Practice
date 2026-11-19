@@ -1,4 +1,4 @@
-﻿import { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { getScenarios } from "../api";
 import type { Scenario } from "../types";
 
@@ -27,6 +27,21 @@ export const SCENARIO_IMAGES: Record<string, string> = {
   "doctor-visit": "/scenarios/门诊.jpg",
   "shopping-return": "/scenarios/购物.webp",
 };
+
+/** 场景中文名：卡片上只显示中文，避免英文标题显得冗杂 */
+const SCENARIO_ZH: Record<string, string> = {
+  "airport-check-in": "机场值机",
+  "hotel-check-in": "酒店入住",
+  "restaurant-order": "餐厅点餐",
+  "job-interview": "面试沟通",
+  "doctor-visit": "就医问诊",
+  "shopping-return": "购物退换",
+  free_talk: "自由对话",
+};
+
+function scenarioLabel(scenario: Scenario): string {
+  return SCENARIO_ZH[scenario.id] ?? scenario.title;
+}
 
 function scenarioLevelRange(scenario: Scenario): string {
   const levels = (scenario.bands ?? []).map((band) => band.level).filter(Boolean);
@@ -70,20 +85,10 @@ export function ScenarioPicker({ profileId, activeScenarioId, onSelect, faded = 
             type="button"
             onClick={() => onSelect(scenario)}
             aria-pressed={scenario.id === activeScenarioId}
+            aria-label={`${scenarioLabel(scenario)} ${scenario.title}`}
           >
-            <span
-              className="scenario-card-media"
-              aria-hidden="true"
-              style={{
-                backgroundImage: SCENARIO_IMAGES[scenario.id]
-                  ? `url("${SCENARIO_IMAGES[scenario.id]}")`
-                  : CATEGORY_TINTS[scenario.category] ?? undefined,
-              }}
-            />
-            <span className="scenario-card-index">{scenario.category} · {scenarioLevelRange(scenario)}</span>
-            <strong>{scenario.title}</strong>
-            <span>{scenario.npc_role}</span>
-            <small>{scenario.background}</small>
+            <strong>{scenarioLabel(scenario)}</strong>
+            <span className="scenario-card-level">{scenarioLevelRange(scenario)}</span>
           </button>
         ))}
       </div>

@@ -1,7 +1,7 @@
 """语音识别路由：上传音频文件（MP3/WAV/OGG）→ 返回识别文字。"""
 from fastapi import APIRouter, HTTPException, UploadFile
 
-from app.asr import AsrEngine
+from app.asr import get_engine
 
 router = APIRouter()
 
@@ -20,9 +20,8 @@ def transcribe_audio(audio: UploadFile) -> dict:
     if not audio_bytes:
         raise HTTPException(status_code=400, detail="音频内容为空")
 
-    engine = AsrEngine()
     try:
-        result = engine.transcribe_audio(audio_bytes)
+        result = get_engine().transcribe_audio(audio_bytes)
     except RuntimeError as exc:
         raise HTTPException(status_code=502, detail=str(exc)) from exc
 

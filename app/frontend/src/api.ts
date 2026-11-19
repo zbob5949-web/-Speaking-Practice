@@ -1,6 +1,12 @@
-﻿import type { ConversationTurn, ErrorReport, GrowthSummary, InlineFeedback, LanguageSupportMode, LanguageSupportResult, LearningPath, OnboardingResponse, PlanDay, PracticeBrief, PracticeSession, Profile, Scenario, ScenarioCatalog, SessionCompletion, SessionHistoryItem, TodayStrategy } from "./types";
+import type { ConversationTurn, ErrorReport, GrowthSummary, InlineFeedback, LanguageSupportMode, LanguageSupportResult, LearningPath, OnboardingResponse, PlanDay, PracticeBrief, PracticeSession, Profile, Scenario, ScenarioCatalog, SessionCompletion, SessionHistoryItem, TodayStrategy } from "./types";
 
-const API_BASE = import.meta.env.VITE_API_BASE ?? "http://localhost:8000";
+// 默认同源（页面与 API 同端口发布）：留空即用当前访问地址，
+// 这样 localhost / 127.0.0.1 / 局域网 IP / 手机访问都能正常工作。
+// 需要前后端分离时用 VITE_API_BASE 指定绝对地址。
+const API_BASE = (import.meta.env.VITE_API_BASE ?? "").replace(/\/$/, "");
+
+/** 登录态失效事件名：App 监听后自动回到登录页 */
+export const UNAUTHORIZED_EVENT = "speakmate:unauthorized";
 
 /**
  * 统一请求封装：自动附加登录 token；token 过期(401)时清理登录态。
@@ -13,6 +19,10 @@ async function apiFetch(input: RequestInfo | URL, init: RequestInit = {}): Promi
   const response = await window.fetch(input, { ...init, headers });
   if (response.status === 401 && typeof input === "string" && !input.includes("/api/auth/")) {
     clearAuth();
+    // 通知界面层：令牌已失效，立刻回到登录页，避免停留在“界面在但操作全失败”的状态
+    if (typeof window !== "undefined" && typeof window.dispatchEvent === "function") {
+      window.dispatchEvent(new Event(UNAUTHORIZED_EVENT));
+    }
     throw new Error("登录已过期，请重新登录");
   }
   return response;
@@ -369,6 +379,15 @@ export async function deleteTurnPair(sessionId: number, userTurnId: number): Pro
   });
   if (!response.ok) {
     throw new Error("Failed to delete turn pair");
+  }
+  return response.json();
+}
+export async function getSessionTurns(
+  sessionId: number
+): Promise<{ session: PracticeSession; turns: ConversationTurn[] }> {
+  const response = await apiFetch(`${API_BASE}/api/sessions/${sessionId}/turns`);
+  if (!response.ok) {
+    throw new Error("加载历史对话失败");
   }
   return response.json();
 }

@@ -1,4 +1,4 @@
-﻿import { ChangeEvent, DragEvent, useEffect, useRef, useState } from "react";
+import { ChangeEvent, DragEvent, forwardRef, useEffect, useImperativeHandle, useRef, useState } from "react";
 import { transcribeAudio } from "../api";
 
 type Props = {
@@ -11,6 +11,14 @@ type Props = {
   autoMode?: boolean;
   /** 每次递增触发一次自动开始录音（父组件在 AI 说完后 +1） */
   autoRecordSignal?: number;
+  /** 录音出错时通知父组件（组件本身在手机端是隐藏的，错误提示要靠父组件展示） */
+  onError?: (message: string) => void;
+};
+
+/** 供对话页「长按输入卡」直接驱动的录音接口 */
+export type VoiceRecorderHandle = {
+  startHold: () => void;
+  endHold: (cancelled?: boolean) => void;
 };
 
 const BAR_COUNT = 24;
@@ -23,13 +31,22 @@ type AudioContextWindow = Window & {
 
 type RecordMode = "hold" | "transcribe";
 
-export function VoiceRecorder({ disabled = false, onText, onVoiceMessage, autoMode = false, autoRecordSignal = 0 }: Props) {
+export const VoiceRecorder = forwardRef<VoiceRecorderHandle, Props>(function VoiceRecorderInner(
+  { disabled = false, onText, onVoiceMessage, autoMode = false, autoRecordSignal = 0, onError }: Props,
+  ref,
+) {
   const [mode, setMode] = useState<RecordMode>("hold");
   const [isRecording, setIsRecording] = useState(false);
   const [isCancelling, setIsCancelling] = useState(false);
   const [isTranscribing, setIsTranscribing] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
   const [waveform, setWaveform] = useState(IDLE_WAVEFORM);
+
+  /** 统一上报错误：既写组件内部状态（桌面端可见），也通知父组件（手机端可见） */
+  const reportError = (message: string) => {
+    setError(message);
+    onError?.(message);
+  };
   const [error, setError] = useState("");
   const [hint, setHint] = useState("");
 
@@ -195,7 +212,7 @@ export function VoiceRecorder({ disabled = false, onText, onVoiceMessage, autoMo
     setHint("");
 
     if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === "undefined") {
-      setError("当前浏览器不支持录音，请改用音频文件测试");
+      reportError("当前环境无法录音：手机需用 HTTPS 或 localhost 访问，且允许麦克风权限");
       return;
     }
 
@@ -224,7 +241,7 @@ export function VoiceRecorder({ disabled = false, onText, onVoiceMessage, autoMo
         if (event.data.size > 0) chunksRef.current.push(event.data);
       };
       recorder.onerror = () => {
-        setError("录音失败，请检查麦克风权限");
+        reportError("录音失败，请检查麦克风权限");
         setIsRecording(false);
         cleanupAudio();
       };
@@ -249,9 +266,9 @@ export function VoiceRecorder({ disabled = false, onText, onVoiceMessage, autoMo
       startYRef.current = null;
     } catch (reason) {
       cleanupAudio();
-      setError(reason instanceof DOMException && reason.name === "NotAllowedError"
+      reportError(reason instanceof DOMException && reason.name === "NotAllowedError"
         ? "请允许麦克风权限后再录音"
-        : "无法打开麦克风，请检查设备");
+        : "无法打开麦克风，请检查设备或权限");
     }
   };
 
@@ -318,6 +335,17 @@ export function VoiceRecorder({ disabled = false, onText, onVoiceMessage, autoMo
     if (recorder && recorder.state !== "inactive") recorder.stop();
     cleanupAudio();
   }, []);
+
+  // 供外部（长按输入卡）直接控制录音
+  useImperativeHandle(ref, () => ({
+    startHold: () => {
+      if (disabled) return;
+      void startRecording("hold");
+    },
+    endHold: (cancelled = false) => {
+      stopRecording(cancelled);
+    },
+  }));
 
   return (
     <div className="voice-recorder" aria-live="polite">
@@ -390,4 +418,5 @@ export function VoiceRecorder({ disabled = false, onText, onVoiceMessage, autoMo
       {error ? <span className="voice-recorder-error" role="alert">{error}</span> : null}
     </div>
   );
-}
+});
+

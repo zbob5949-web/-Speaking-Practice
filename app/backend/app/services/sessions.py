@@ -532,3 +532,12 @@ def clear_session_history(session_id: int) -> dict[str, object]:
     if not repo.clear_session_history(session_id):
         raise HTTPException(status_code=404, detail="Session not found")
     return {"status": "cleared", "session_id": session_id}
+
+
+def get_session_turns(session_id: int) -> dict[str, object]:
+    """回放某一场历史会话：返回会话信息与全部对话轮次。"""
+    repo = deps.get_repository()
+    session = repo.get_session(session_id)
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found")
+    return {"session": session, "turns": repo.get_turns(session_id)}

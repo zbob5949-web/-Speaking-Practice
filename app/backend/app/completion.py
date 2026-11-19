@@ -40,31 +40,65 @@ def has_major_blocker(feedback: list[dict[str, Any]]) -> bool:
 
 
 # 告别句语义检测：对话双方任一方说出 goodbye 类告别语时，提示本轮结束并总结
-FAREWELL_PATTERNS: tuple[str, ...] = (
+#
+# 分强/弱两档，避免日常用语误判：
+#   强信号 —— goodbye / bye / farewell，语义唯一，命中即视为道别。
+#   弱信号 —— see you / take care / good night 等，日常对话中经常不是告别
+#             （"may I see you"、"nice to see you"、"I see you yesterday"），
+#             因此要求至少进行到第 2 个用户回合才生效。
+# 裸 "see you" 已从两档中移除：它是英文 ASR 幻觉的高频输出，单独出现不足以判结束；
+# "see you soon/later/tomorrow" 这类完整告别语仍保留。
+STRONG_FAREWELL_PATTERNS: tuple[str, ...] = (
     r"\bgoodbye\b",
     r"\bgood bye\b",
-    r"\bbye[- ]bye\b",
+    r"\bbye[- ]?bye\b",
     r"\bbye\b",
     r"\bfarewell\b",
+    # 带时间/场合的完整告别语，语义唯一，不受轮次门控限制
     r"\bsee you (soon|later|tomorrow|tonight|around|next week)\b",
+    r"\btalk to you later\b",
+    r"\bcatch you later\b",
+    r"\buntil next time\b",
+    r"\bhave a (good|nice|great|wonderful) day\b",
+)
+# 弱信号：单独出现时在真实对话里经常不是告别（"take care of your bag"、"good night" 作寒暄），
+# 因此要求至少完成 2 个用户回合才生效。裸 "see you" 也在此档：
+# 第 1 轮出现基本是英文 ASR 对中文的误识别（实测中文「你好」→ "see you"）。
+WEAK_FAREWELL_PATTERNS: tuple[str, ...] = (
     r"\bsee you\b",
     r"\bsee ya\b",
     r"\bsee u\b",
     r"\btake care\b",
     r"\bgood ?night\b",
-    r"\bhave a (good|nice|great|wonderful) day\b",
-    r"\btalk to you later\b",
-    r"\bcatch you later\b",
-    r"\buntil next time\b",
 )
-FAREWELL_RE = re.compile("|".join(FAREWELL_PATTERNS), re.IGNORECASE)
+STRONG_FAREWELL_RE = re.compile("|".join(STRONG_FAREWELL_PATTERNS), re.IGNORECASE)
+WEAK_FAREWELL_RE = re.compile("|".join(WEAK_FAREWELL_PATTERNS), re.IGNORECASE)
+FAREWELL_RE = re.compile(
+    "|".join(STRONG_FAREWELL_PATTERNS + WEAK_FAREWELL_PATTERNS), re.IGNORECASE
+)
+# 「I see you」「nice to see you」「may I see you」里的 see you 不是告别，
+# 匹配弱信号前先剔掉这些上下文；后面跟 soon/later/tomorrow 的完整告别语不受影响。
+SEE_YOU_NON_FAREWELL_RE = re.compile(
+    r"\b(?:i|to|can|may|should|would|could|did|do|does|nice|good|glad|happy)\s+see you\b"
+    r"(?!\s+(?:soon|later|tomorrow|tonight|around|next week))",
+    re.IGNORECASE,
+)
 FAREWELL_SCAN_TURNS = 4
+# 弱信号生效所需的最少用户回合数：第 1 轮就说 see you / take care 视为误识别
+WEAK_FAREWELL_MIN_USER_TURNS = 2
 
 
 def has_farewell(turns: list[dict[str, Any]]) -> bool:
     """检测最近几轮对话（用户/助手任一方）是否出现告别句。"""
     recent = [str(turn.get("text") or "") for turn in turns[-FAREWELL_SCAN_TURNS:]]
-    return any(FAREWELL_RE.search(text) for text in recent)
+    if any(STRONG_FAREWELL_RE.search(text) for text in recent):
+        return True
+    if len(user_turns(turns)) < WEAK_FAREWELL_MIN_USER_TURNS:
+        return False
+    return any(
+        WEAK_FAREWELL_RE.search(SEE_YOU_NON_FAREWELL_RE.sub(" ", text))
+        for text in recent
+    )
 
 
 def is_early_farewell(turns: list[dict[str, Any]]) -> bool:

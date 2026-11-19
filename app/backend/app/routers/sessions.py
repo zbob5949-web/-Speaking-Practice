@@ -50,6 +50,12 @@ def list_sessions(profile_id: int | None = None, limit: int = 60) -> dict[str, o
     return {"sessions": sessions}
 
 
+@router.get("/api/sessions/{session_id}/turns")
+def session_turns(session_id: int) -> dict[str, object]:
+    """读取某一轮历史会话的全部对话内容（只读回放）。"""
+    return sessions_service.get_session_turns(session_id)
+
+
 @router.delete("/api/sessions/{session_id}/history")
 def clear_session_history(session_id: int) -> dict[str, object]:
     return sessions_service.clear_session_history(session_id)

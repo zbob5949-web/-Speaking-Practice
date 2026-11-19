@@ -52,6 +52,24 @@ export function GrowthPage({ profileId }: { profileId?: number }) {
 
       {status === "ready" ? (
       <div className="growth-content">
+        <div className="m-stat-grid">
+          <div className="m-stat">
+            <strong>{memory.length}</strong>
+            <span>长期记忆</span>
+          </div>
+          <div className="m-stat">
+            <strong>{adjustments.length}</strong>
+            <span>自适应调整</span>
+          </div>
+          <div className="m-stat">
+            <strong>{strengths.length}</strong>
+            <span>优势项</span>
+          </div>
+          <div className="m-stat">
+            <strong>{weaknesses.length}</strong>
+            <span>待改进</span>
+          </div>
+        </div>
         <div className="growth-grid">
           <section className="growth-card">
             <p className="section-label">最近复盘</p>
