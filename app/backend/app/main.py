@@ -16,6 +16,7 @@ from app.context import current_user_id
 from app.dependencies import get_repository  # noqa: F401
 from app.llm import create_llm_provider  # noqa: F401
 from app.routers import (
+    admin,
     asr,
     auth,
     favorites,
@@ -59,6 +60,7 @@ app.include_router(language_support.router)
 app.include_router(scenarios.router)
 app.include_router(favorites.router)
 app.include_router(translate.router)
+app.include_router(admin.router)
 
 # ── 安全访问限制:强制鉴权 + 按用户限流 ────────────────────────
 # 白名单:健康检查、认证接口(登录/注册/游客/刷新)免登录。
@@ -158,6 +160,22 @@ async def auth_and_rate_limit(request: Request, call_next):
         return await call_next(request)
     finally:
         current_user_id.reset(token)
+
+
+# ── 站点访问口令门禁（可选）────────────────────────────────
+# 在 .env 中设置 ACCESS_PASSWORD 即开启；未设置时完全关闭，行为与之前一致。
+# 注意注册顺序：本中间件必须在 auth_and_rate_limit 之后注册，才能位于其外层、
+# 先于它执行。否则 /api/auth/guest 会先被放行，陌生人可无限领取游客令牌绕过限流。
+from app import access_gate
+
+
+@app.middleware("http")
+async def access_password_gate(request: Request, call_next):
+    # 门禁自身的登录/登出请求在此处理（需在静态挂载之前拦截）
+    gate_response = await access_gate.handle_gate_request(request)
+    if gate_response is not None:
+        return gate_response
+    return await access_gate.gate_middleware(request, call_next)
 
 
 # ── 提交版增强：单端口发布 ──────────────────────────────
