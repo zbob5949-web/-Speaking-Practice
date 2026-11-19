@@ -5,6 +5,7 @@ import { addFavorite, authGuest, authLogin, authRegister, clearAuth, completeSes
 import App from "./App";
 
 vi.mock("./api", () => ({
+  UNAUTHORIZED_EVENT: "speakmate:unauthorized",
   addFavorite: vi.fn(),
   removeFavorite: vi.fn(),
   authLogin: vi.fn(),
@@ -969,6 +970,26 @@ test("shows login page when signed out", async () => {
   expect(screen.getByRole("tab", { name: "注册" })).toBeTruthy();
   expect(screen.getByRole("button", { name: "以游客身份进入" })).toBeTruthy();
   expect(screen.getByLabelText("登录注册表单")).toBeTruthy();
+});
+
+test("returns to login page when the token expires mid-session (401)", async () => {
+  (getCurrentLearningState as Mock).mockResolvedValue(onboardingResult);
+  (startSession as Mock).mockResolvedValue(startedSession);
+
+  render(<App />);
+
+  // 先进到已登录界面
+  await screen.findByText("今日场景");
+
+  // 令牌过期：api 层清理登录态并广播事件（此处模拟其效果）
+  clearAuth();
+  window.dispatchEvent(new Event("speakmate:unauthorized"));
+
+  await waitFor(() => {
+    expect(clearAuth).toHaveBeenCalled();
+  });
+  expect(await screen.findByRole("button", { name: "以游客身份进入" })).toBeTruthy();
+  expect(screen.queryByText("今日场景")).toBeNull();
 });
 
 test("logs in with phone and password and enters the app", async () => {

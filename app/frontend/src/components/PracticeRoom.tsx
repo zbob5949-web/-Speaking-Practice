@@ -1,9 +1,11 @@
-﻿import { useEffect, useRef, useState } from "react";
-import { clearSessionHistory, completeSession, deleteTurnPair, getSelectedVoice, playAudioFromUrl, sendUserTurnStream, startScenarioSession, startSession, playTTS, stopActiveAudio, transcribeAudio, translateText } from "../api";
-import type { ConversationTurn, ErrorReport, ErrorReportItem, InlineFeedback, LanguageSupportResult, PlanDay, PracticeBrief, PracticeSession, Scenario, SessionCompletion, TargetExpression, TodayStrategy } from "../types";
+import { Fragment, useEffect, useRef, useState } from "react";
+import { clearSessionHistory, completeSession, deleteTurnPair, getSelectedVoice, getSessionHistory, getSessionTurns, playAudioFromUrl, sendUserTurnStream, startScenarioSession, startSession, playTTS, stopActiveAudio, transcribeAudio, translateText } from "../api";
+import type { ConversationTurn, ErrorReport, ErrorReportItem, InlineFeedback, LanguageSupportResult, PlanDay, PracticeBrief, PracticeSession, Scenario, SessionCompletion, SessionHistoryItem, TargetExpression, TodayStrategy } from "../types";
 import { PrimaryButton, SecondaryButton } from "./ui";
 import { VoiceRecorder } from "./VoiceRecorder";
-import { ScenarioPicker, SCENARIO_IMAGES } from "./ScenarioPicker";
+import type { VoiceRecorderHandle } from "./VoiceRecorder";
+import { ScenarioPicker } from "./ScenarioPicker";
+import { useIsMobile } from "../useIsMobile";
 
 type Props = {
   day?: PlanDay | null;
@@ -252,6 +254,43 @@ function ExpressionCard({ expression }: { expression: TargetExpression }) {
   );
 }
 
+/** 场景中文名：最近对话里不显示英文标题 */
+const SCENARIO_ZH: Record<string, string> = {
+  "airport-check-in": "机场值机",
+  "hotel-check-in": "酒店入住",
+  "restaurant-order": "餐厅点餐",
+  "job-interview": "面试沟通",
+  "doctor-visit": "就医问诊",
+  "shopping-return": "购物退换",
+  free_talk: "自由对话",
+};
+
+/** 纠错列表：桌面右侧栏与手机底部抽屉共用同一份渲染，避免两处维护。 */
+function FeedbackList({
+  items,
+  onLocate,
+}: {
+  items: FeedbackTimelineItem[];
+  onLocate?: (turnId: number) => void;
+}) {
+  if (items.length === 0) {
+    return <p className="feedback-item">发送第一句后，这里会显示纠错和表达建议。</p>;
+  }
+  return (
+    <>
+      {items.map((item) =>
+        item.kind === "feedback" ? (
+          <FeedbackCard item={item.item} key={item.id} onLocate={onLocate} />
+        ) : (
+          <div className="language-support-dock" key={item.id}>
+            <LanguageSupportCard result={item.result} />
+          </div>
+        ),
+      )}
+    </>
+  );
+}
+
 export function PracticeRoom({ day, scenario, todayStrategy, profileId, learningPath, onSelectScenario, onFreeTalk }: Props) {
   const [session, setSession] = useState<PracticeSession | null>(null);
   const [turns, setTurns] = useState<ConversationTurn[]>([]);
@@ -269,6 +308,44 @@ export function PracticeRoom({ day, scenario, todayStrategy, profileId, learning
   const [isCompletingSession, setIsCompletingSession] = useState(false);
   const [isClearingHistory, setIsClearingHistory] = useState(false);
   const [dismissedCompletionSuggestion, setDismissedCompletionSuggestion] = useState(false);
+  // 结束确认面板：null=关闭，"manual"=用户主动结束，"agent_suggested"=AI 建议结束
+  const [completingChoice, setCompletingChoice] = useState<"manual" | "agent_suggested" | null>(null);
+  // ---- 手机端对话界面（≤600px）：顶部栏 / 菜单抽屉 / 纠错抽屉 ----
+  const isMobile = useIsMobile();
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [feedbackOpen, setFeedbackOpen] = useState(false);
+  const [isStartingNew, setIsStartingNew] = useState(false);
+  // 递增触发会话重新启动（「新建会话」）
+  const [sessionEpoch, setSessionEpoch] = useState(0);
+  // 最近对话（左上角入口）
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const [historyItems, setHistoryItems] = useState<SessionHistoryItem[]>([]);
+  const [isLoadingHistory, setIsLoadingHistory] = useState(false);
+  // 点击某一轮历史：回放该轮对话
+  const [replayTitle, setReplayTitle] = useState("");
+  const [replayTurns, setReplayTurns] = useState<ConversationTurn[] | null>(null);
+  const [replayLoading, setReplayLoading] = useState(false);
+  // 长按输入卡触发录音：VoiceRecorder 保持挂载但视觉隐藏，通过 ref 直接驱动
+  const voiceWrapRef = useRef<HTMLDivElement | null>(null);
+  const voiceRef = useRef<VoiceRecorderHandle | null>(null);
+  const holdTimerRef = useRef<number | null>(null);
+  const holdingRef = useRef(false);
+  const holdStartYRef = useRef<number | null>(null);
+  // 长按录音时的浮层提示
+  const [recordingUi, setRecordingUi] = useState(false);
+  // 录音相关错误提示（录音器在手机端是隐藏的，错误要在这里显示）
+  const [voiceToast, setVoiceToast] = useState("");
+
+  useEffect(() => {
+    if (!voiceToast) return;
+    const timer = window.setTimeout(() => setVoiceToast(""), 4000);
+    return () => window.clearTimeout(timer);
+  }, [voiceToast]);
+  // 实时纠错悬浮窗位置（可拖动）
+  const [feedbackPos, setFeedbackPos] = useState({ x: 12, y: 150 });
+  const floatDragRef = useRef<{ dx: number; dy: number } | null>(null);
+  // 提示页「可直接套用的表达」是否展开（默认收起，保持预览清爽）
+  const [expressionsOpen, setExpressionsOpen] = useState(false);
   const [bilingualEnabled, setBilingualEnabled] = useState(() => localStorage.getItem("speakmate-bilingual") !== "off");
   // AI 回复自动朗读：默认开启，可一键静音（持久化到 localStorage）
   const [ttsMuted, setTtsMuted] = useState(() => localStorage.getItem("speakmate-tts-muted") === "on");
@@ -354,8 +431,6 @@ export function PracticeRoom({ day, scenario, todayStrategy, profileId, learning
 
   const isScenarioMode = Boolean(scenario);
   const isFreeTalk = scenario?.id === "free_talk";
-  // 当前场景板块的背景图：有对应图片时显示为封面背景
-  const topicImage = scenario ? SCENARIO_IMAGES[scenario.id] : undefined;
 
   const handleFeedbackScroll = (e: React.UIEvent<HTMLElement>) => {
     const target = e.currentTarget;
@@ -473,8 +548,8 @@ export function PracticeRoom({ day, scenario, todayStrategy, profileId, learning
         setPracticeBrief(result.practice_brief || null);
         setCompletion(result.completion || null);
         const hasUserTurns = result.turns.some((turn) => turn.speaker === "user");
-        // 自由对话直接进入对话，跳过课程简报
-        setLessonPhase(result.practice_brief && !hasUserTurns && scenario?.id !== "free_talk" ? "learn" : "practice");
+        // 默认直接进入 AI 对话界面；「开口前提示」改为按需打开（顶部/输入卡的提示入口）
+        setLessonPhase("practice");
         setTranslations({});
         setVoiceTurnIds(new Set());
         setVoiceMeta(new Map());
@@ -489,7 +564,7 @@ export function PracticeRoom({ day, scenario, todayStrategy, profileId, learning
       }
     }
     void boot();
-  }, [scenario?.id, day?.id]);
+  }, [scenario?.id, day?.id, sessionEpoch]);
 
   // 双语展示：按需为消息生成中文翻译（缓存；电话模式下双方消息都翻译）
   useEffect(() => {
@@ -773,9 +848,10 @@ export function PracticeRoom({ day, scenario, todayStrategy, profileId, learning
       setIsClearingHistory(false);
     }
   }
-  async function handleCompleteSession(completionType: "manual" | "agent_suggested" = "manual") {
+  /** 只负责真正执行结束（由确认面板触发），不再弹原生 confirm */
+  async function performCompleteSession(completionType: "manual" | "agent_suggested" = "manual") {
     if (!session || isCompletingSession) return;
-    // 直接结束并总结，不再弹二次确认
+    setCompletingChoice(null);
     setIsCompletingSession(true);
     setApiError("");
     try {
@@ -787,6 +863,166 @@ export function PracticeRoom({ day, scenario, todayStrategy, profileId, learning
     } finally {
       setIsCompletingSession(false);
     }
+  }
+
+  function toggleBilingual() {
+    setBilingualEnabled((value) => {
+      const next = !value;
+      localStorage.setItem("speakmate-bilingual", next ? "on" : "off");
+      return next;
+    });
+  }
+
+  function toggleTts() {
+    setTtsMuted((value) => {
+      const next = !value;
+      localStorage.setItem("speakmate-tts-muted", next ? "on" : "off");
+      return next;
+    });
+  }
+
+  /** 新建会话：清空当前会话记录后重新启动一次（手机端顶部胶囊的 ＋ 触发） */
+  async function handleNewSession() {
+    if (isStartingNew) return;
+    if (!window.confirm("开始新的会话？当前对话与纠错记录会被清空。")) return;
+    setIsStartingNew(true);
+    try {
+      if (session) await clearSessionHistory(session.id);
+    } catch {
+      // 清空失败也继续重启，保证按钮始终可用
+    } finally {
+      setIsStartingNew(false);
+      setMenuOpen(false);
+      setFeedbackOpen(false);
+      setTypedText("");
+      setSessionEpoch((value) => value + 1);
+    }
+  }
+
+  /** 打开「最近对话」：直接复用后端 sessions 列表（每轮结束时的打分/总结就是一轮的基准） */
+  async function openHistory() {
+    setHistoryOpen(true);
+    if (historyItems.length > 0 || isLoadingHistory) return;
+    setIsLoadingHistory(true);
+    try {
+      const result = await getSessionHistory(profileId);
+      setHistoryItems(result.sessions.slice(0, 8));
+    } catch {
+      setHistoryItems([]);
+    } finally {
+      setIsLoadingHistory(false);
+    }
+  }
+
+  /** 一轮对话的中文一句话摘要：优先解析本轮结束时的 JSON 总结，其次退回结构化信息 */
+  function historySummary(item: SessionHistoryItem): string {
+    const raw = typeof item.summary === "string" ? item.summary.trim() : "";
+    let parsed: Record<string, unknown> | null = null;
+    if (raw.startsWith("{")) {
+      try {
+        parsed = JSON.parse(raw) as Record<string, unknown>;
+      } catch {
+        parsed = null;
+      }
+    }
+    if (parsed) {
+      for (const key of ["summary_zh", "score_detail_zh"]) {
+        const value = parsed[key];
+        if (typeof value === "string" && value.trim()) {
+          const text = value.trim();
+          return text.length > 40 ? `${text.slice(0, 40)}…` : text;
+        }
+      }
+    } else if (raw && !raw.startsWith("{")) {
+      return raw.length > 40 ? `${raw.slice(0, 40)}…` : raw;
+    }
+    const bits: string[] = [];
+    if (item.turn_count) bits.push(`${item.turn_count} 轮`);
+    if (item.difficulty) bits.push(item.difficulty);
+    if (typeof item.score === "number") bits.push(`${item.score} 分`);
+    return bits.length > 0 ? bits.join(" · ") : "已完成";
+  }
+
+  function scenarioZh(item: SessionHistoryItem): string {
+    return SCENARIO_ZH[item.scenario_id ?? ""] ?? (item.topic || "练习");
+  }
+
+  /** 点击最近对话里的一轮：加载并回放那场对话 */
+  async function openReplay(item: SessionHistoryItem) {
+    setReplayTitle(scenarioZh(item));
+    setReplayTurns(null);
+    setReplayLoading(true);
+    try {
+      const result = await getSessionTurns(item.id);
+      setReplayTurns(result.turns);
+    } catch {
+      setReplayTurns([]);
+    } finally {
+      setReplayLoading(false);
+    }
+  }
+
+  // ---- 长按输入卡（含输入框本体）= 录音 ----
+  function handleComposerPointerDown(event: React.PointerEvent<HTMLDivElement>) {
+    if (!isMobile) return;
+    const target = event.target as HTMLElement | null;
+    // 只有按钮/加号/chips 不触发；输入框本身也属于「输入卡」，长按同样说话
+    if (target?.closest("button, input, .m-chip")) return;
+    holdStartYRef.current = event.clientY;
+    holdingRef.current = false;
+    if (holdTimerRef.current) window.clearTimeout(holdTimerRef.current);
+    holdTimerRef.current = window.setTimeout(() => {
+      holdTimerRef.current = null;
+      holdingRef.current = true;
+      // 收起软键盘，别让键盘占着屏幕
+      (document.activeElement as HTMLElement | null)?.blur?.();
+      if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === "undefined") {
+        setVoiceToast("当前环境无法录音：手机需要用 HTTPS 或 localhost 打开，并允许麦克风");
+        return;
+      }
+      setRecordingUi(true);
+      voiceRef.current?.startHold();
+    }, 320);
+  }
+
+  function handleComposerPointerMove(event: React.PointerEvent<HTMLDivElement>) {
+    if (!holdingRef.current) return;
+    // 上滑取消
+    if (holdStartYRef.current !== null && holdStartYRef.current - event.clientY > 64) {
+      endComposerHold(true);
+    }
+  }
+
+  function endComposerHold(cancelled: boolean) {    if (holdTimerRef.current) {
+      window.clearTimeout(holdTimerRef.current);
+      holdTimerRef.current = null;
+    }
+    if (!holdingRef.current) return;
+    holdingRef.current = false;
+    setRecordingUi(false);
+    voiceRef.current?.endHold(cancelled);
+  }
+
+  // ---- 纠错悬浮窗拖动 ----
+  function handleFloatDown(event: React.PointerEvent<HTMLElement>) {
+    const panel = event.currentTarget.parentElement;
+    if (!panel) return;
+    const rect = panel.getBoundingClientRect();
+    floatDragRef.current = { dx: event.clientX - rect.left, dy: event.clientY - rect.top };
+    event.currentTarget.setPointerCapture?.(event.pointerId);
+  }
+
+  function handleFloatMove(event: React.PointerEvent<HTMLElement>) {
+    const drag = floatDragRef.current;
+    if (!drag) return;
+    const width = 264;
+    const nextX = Math.min(Math.max(0, event.clientX - drag.dx), window.innerWidth - width - 6);
+    const nextY = Math.min(Math.max(0, event.clientY - drag.dy), window.innerHeight - 140);
+    setFeedbackPos({ x: nextX, y: nextY });
+  }
+
+  function handleFloatUp() {
+    floatDragRef.current = null;
   }
 
   if (lessonPhase === "learn" && practiceBrief) {
@@ -804,7 +1040,9 @@ export function PracticeRoom({ day, scenario, todayStrategy, profileId, learning
               <h1>{practiceBrief.title || day?.topic || scenario?.title}</h1>
             </div>
             <p>{practiceBrief.user_visible_goal || practiceBrief.conversation_objective || day?.objective}</p>
-            <PrimaryButton onClick={() => setLessonPhase("practice")}>开始对话练习</PrimaryButton>
+            {!isMobile ? (
+              <PrimaryButton onClick={() => setLessonPhase("practice")}>开始对话练习</PrimaryButton>
+            ) : null}
           </header>
 
           <div className="lesson-brief-grid">
@@ -814,39 +1052,49 @@ export function PracticeRoom({ day, scenario, todayStrategy, profileId, learning
               <p>{practiceBrief.scenario_setup || day?.scenario}</p>
             </section>
 
-            {practiceBrief.lesson_focus || taskSteps.length > 0 ? (
-              <section className="lesson-brief-card">
-                <p className="section-label">练习方式</p>
-                {practiceBrief.lesson_focus ? <p>{practiceBrief.lesson_focus}</p> : null}
-                {taskSteps.length > 0 ? (
-                  <ol className="lesson-watch-list">
-                    {taskSteps.map((step) => (
-                      <li key={step}>{step}</li>
-                    ))}
-                  </ol>
-                ) : null}
-              </section>
-            ) : null}
-
             <section className="lesson-brief-card lesson-brief-card-accent">
-              <p className="section-label">可直接套用的表达</p>
-              {visibleExpressions.length > 0 ? (
-                <ul className="lesson-expression-list">
-                  {visibleExpressions.map((expression) => (
-                    <ExpressionCard expression={expression} key={expressionLabel(expression)} />
-                  ))}
-                </ul>
+              <button
+                type="button"
+                className="lesson-collapse-head"
+                aria-expanded={expressionsOpen}
+                onClick={() => setExpressionsOpen((value) => !value)}
+              >
+                <span className="section-label">可直接套用的表达</span>
+                <span className="lesson-collapse-toggle" aria-hidden="true">
+                  {expressionsOpen ? "收起" : "展开"}
+                </span>
+              </button>
+              {expressionsOpen ? (
+                visibleExpressions.length > 0 ? (
+                  <ul className="lesson-expression-list">
+                    {visibleExpressions.map((expression) => (
+                      <ExpressionCard expression={expression} key={expressionLabel(expression)} />
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="muted">围绕场景目标组织你的第一句话。</p>
+                )
               ) : (
-                <p className="muted">围绕场景目标组织你的第一句话。</p>
+                <p className="muted">{visibleExpressions.length} 条表达，点「展开」查看</p>
               )}
             </section>
           </div>
         </section>
+        {isMobile ? (
+          <div className="m-brief-bar">
+            <PrimaryButton onClick={() => setLessonPhase("practice")}>开始对话练习</PrimaryButton>
+          </div>
+        ) : null}
       </main>
     );
   }
 
   const hasUserTurn = turns.some((turn) => turn.speaker === "user");
+  // AI 第一句话下方给一行「可以直接说」的表达提示
+  const firstAssistantTurnId = turns.find((turn) => turn.speaker === "assistant")?.id ?? -1;
+  const hintExpressions = (practiceBrief?.target_expressions ?? [])
+    .slice(0, 2)
+    .map((item) => (typeof item === "string" ? item : item.expression));
   // 学习路线：当前场景在路线中的位置，用于完成后「继续下一张卡片」
   const pathIndex = learningPath && scenario ? learningPath.findIndex((item) => item.id === scenario.id) : -1;
   const nextPathItem =
@@ -863,6 +1111,55 @@ export function PracticeRoom({ day, scenario, todayStrategy, profileId, learning
   return (
     <main className="practice-page">
       {apiError ? <p className="error-message" role="alert">{apiError}</p> : null}
+      {isMobile ? (
+        <header className="m-chat-top">
+          <button
+            type="button"
+            className="m-circle-btn"
+            aria-label="查看最近对话"
+            title="最近对话"
+            onClick={() => void openHistory()}
+          >
+            <span className="m-burger" aria-hidden="true"><i /><i /></span>
+          </button>
+          <div className="m-pill">
+            <button
+              type="button"
+              className="m-pill-btn"
+              aria-pressed={feedbackOpen}
+              aria-label="实时纠错"
+              title="实时纠错"
+              onClick={() => setFeedbackOpen((value) => !value)}
+            >
+              <span aria-hidden="true">✎</span>
+              {feedbackTimeline.length > 0 ? (
+                <span className="m-pill-count">{feedbackTimeline.length}</span>
+              ) : null}
+            </button>
+            <span className="m-pill-sep" aria-hidden="true" />
+            <button
+              type="button"
+              className="m-pill-btn"
+              aria-pressed={!ttsMuted}
+              aria-label={ttsMuted ? "开启 AI 朗读" : "关闭 AI 朗读"}
+              onClick={toggleTts}
+            >
+              <span aria-hidden="true">{ttsMuted ? "🔇" : "🔊"}</span>
+            </button>
+            <span className="m-pill-sep" aria-hidden="true" />
+            <button
+              type="button"
+              className="m-pill-btn m-pill-btn-strong"
+              aria-label="新建会话"
+              title="新建会话"
+              disabled={isStartingNew}
+              onClick={() => void handleNewSession()}
+            >
+              <span aria-hidden="true">＋</span>
+            </button>
+          </div>
+        </header>
+      ) : null}
       <section className="practice-workspace">
         <div className="practice-main">
           {onSelectScenario && !isScenarioMode ? (
@@ -873,11 +1170,7 @@ export function PracticeRoom({ day, scenario, todayStrategy, profileId, learning
               faded={hasUserTurn}
             />
           ) : null}
-          <section
-            className={"topic-strip" + (topicImage ? " topic-strip-cover" : "")}
-            aria-label={isScenarioMode ? "当前场景" : "今日场景"}
-            style={topicImage ? { backgroundImage: `url("${topicImage}")` } : undefined}
-          >
+          <section className="topic-strip" aria-label={isScenarioMode ? "当前场景" : "今日场景"}>
             <div>
               <p>{isScenarioMode ? "当前场景" : "今日场景"}</p>
               <h1>{scenario?.title ?? day?.topic}</h1>
@@ -933,7 +1226,7 @@ export function PracticeRoom({ day, scenario, todayStrategy, profileId, learning
                 </SecondaryButton>
               ) : null}
               {hasUserTurn && !isCompleted ? (
-                <SecondaryButton type="button" onClick={() => handleCompleteSession("manual")} disabled={isCompletingSession}>
+                <SecondaryButton type="button" onClick={() => setCompletingChoice("manual")} disabled={isCompletingSession}>
                   {isCompletingSession ? "生成总结中…" : isScenarioMode ? "结束练习" : "结束今日练习"}
                 </SecondaryButton>
               ) : null}
@@ -977,11 +1270,11 @@ export function PracticeRoom({ day, scenario, todayStrategy, profileId, learning
                       )
                     : [];
                   return (
-                    <article
-                      className={(isUser ? "message-row message-row-user" : "message-row") + (highlightedTurnId === turn.id ? " message-row-highlight" : "")}
-                      key={turn.id}
-                      data-turn-id={turn.id}
-                    >
+                    <Fragment key={turn.id}>
+                      <article
+                        className={(isUser ? "message-row message-row-user" : "message-row") + (highlightedTurnId === turn.id ? " message-row-highlight" : "")}
+                        data-turn-id={turn.id}
+                      >
                       {!isUser ? (
                         <div className="message-avatar message-avatar-assistant" aria-hidden="true">
                           {ASSISTANT_AVATAR}
@@ -1078,6 +1371,15 @@ export function PracticeRoom({ day, scenario, todayStrategy, profileId, learning
                         </div>
                       ) : null}
                     </article>
+                      {!isUser && turn.id === firstAssistantTurnId && hintExpressions.length > 0 ? (
+                        <p className="chat-hint-line">
+                          <span className="chat-hint-label">可以直接说</span>
+                          {hintExpressions.map((text) => (
+                            <em className="chat-hint-chip" key={text}>{text}</em>
+                          ))}
+                        </p>
+                      ) : null}
+                    </Fragment>
                   );
                 })}
                 {streamingReply !== null && (
@@ -1126,13 +1428,22 @@ export function PracticeRoom({ day, scenario, todayStrategy, profileId, learning
               </div>
             </div>
 
-            <div className="chat-composer" aria-label="对话输入区">
+            <div
+              className={isMobile ? "chat-composer chat-composer-mobile" : "chat-composer"}
+              aria-label="对话输入区"
+              onPointerDown={isMobile ? handleComposerPointerDown : undefined}
+              onPointerMove={isMobile ? handleComposerPointerMove : undefined}
+              onPointerUp={isMobile ? () => endComposerHold(false) : undefined}
+              onPointerCancel={isMobile ? () => endComposerHold(true) : undefined}
+              onPointerLeave={isMobile ? () => endComposerHold(true) : undefined}
+              onContextMenu={isMobile ? (event) => event.preventDefault() : undefined}
+            >
               {showCompletionSuggestion ? (
                 <section className="feedback-card feedback-card-guidance" aria-label="结束建议">
                   <p className="feedback-card-label">今天可以收束了</p>
                   <p>{completion.suggestion_reason_zh || "今天的核心目标已经基本练到了。"}</p>
                   <div className="topic-strip-actions">
-                    <PrimaryButton type="button" onClick={() => handleCompleteSession("agent_suggested")}>
+                    <PrimaryButton type="button" onClick={() => setCompletingChoice("agent_suggested")}>
                       结束并总结
                     </PrimaryButton>
                     <SecondaryButton type="button" onClick={() => setDismissedCompletionSuggestion(true)}>
@@ -1143,7 +1454,8 @@ export function PracticeRoom({ day, scenario, todayStrategy, profileId, learning
               ) : null}
               <textarea
                 aria-label="输入你的回答"
-                placeholder="可以录音转文字，也可以直接输入英文。确认后点击发送。"
+                placeholder={isMobile ? "说一句英文，或长按这里说话" : "可以录音转文字，也可以直接输入英文。确认后点击发送。"}
+                {...({ enterKeyHint: "send", autoCapitalize: "off", autoCorrect: "off" } as Record<string, string>)}
                 value={typedText}
                 onChange={(event) => setTypedText(event.target.value)}
                 onKeyDown={(event) => {
@@ -1155,25 +1467,81 @@ export function PracticeRoom({ day, scenario, todayStrategy, profileId, learning
                   }
                 }}
               />
-              <div className="composer-toolbar">
-                <VoiceRecorder
-                  disabled={isSubmitting}
-                  autoMode={phoneMode}
-                  autoRecordSignal={autoRecordSignal}
-                  onText={(text) => {
-                    if (phoneModeRef.current) {
-                      // 电话模式：识别即自动发送，无需手动点发送
-                      void submitTurn(text);
-                    } else {
-                      setTypedText((current) => current.trim() ? current.trim() + " " + text : text);
-                    }
-                  }}
-                  onVoiceMessage={(blob, durationMs) => void handleVoiceMessage(blob, durationMs)}
-                />
-                <PrimaryButton disabled={isSubmitting || !typedText.trim()} onClick={() => submitTurn(typedText)}>
-                  {isSubmitting ? "发送中…" : "发送"}
-                </PrimaryButton>
-              </div>
+              {isMobile ? (
+                <div className="m-composer-actions">
+                  <div className="m-chips">
+                    <button
+                      type="button"
+                      className={bilingualEnabled ? "m-chip m-chip-on" : "m-chip"}
+                      aria-pressed={bilingualEnabled}
+                      onClick={toggleBilingual}
+                    >
+                      <span className="m-chip-icon" aria-hidden="true">🌐</span>
+                      <span>双语</span>
+                    </button>
+                    {practiceBrief ? (
+                      <button
+                        type="button"
+                        className="m-chip"
+                        onClick={() => setLessonPhase("learn")}
+                      >
+                        <span className="m-chip-icon" aria-hidden="true">💡</span>
+                        <span>提示</span>
+                      </button>
+                    ) : null}
+                  </div>
+                  <button
+                    type="button"
+                    className="m-plus-btn"
+                    aria-label="更多操作"
+                    title="更多操作"
+                    onClick={() => setMenuOpen(true)}
+                  >
+                    <span aria-hidden="true">＋</span>
+                  </button>
+                  <div className="m-voice-hidden" ref={voiceWrapRef}>
+                    <VoiceRecorder
+                      ref={voiceRef}
+                      disabled={isSubmitting}
+                      onError={(message) => {
+                        setRecordingUi(false);
+                        setVoiceToast(message);
+                      }}
+                      autoMode={phoneMode}
+                      autoRecordSignal={autoRecordSignal}
+                      onText={(text) => {
+                        if (phoneModeRef.current) {
+                          // 电话模式：识别即自动发送，无需手动点发送
+                          void submitTurn(text);
+                        } else {
+                          setTypedText((current) => current.trim() ? current.trim() + " " + text : text);
+                        }
+                      }}
+                      onVoiceMessage={(blob, durationMs) => void handleVoiceMessage(blob, durationMs)}
+                    />
+                  </div>
+                </div>
+              ) : (
+                <div className="composer-toolbar">
+                  <VoiceRecorder
+                    disabled={isSubmitting}
+                    autoMode={phoneMode}
+                    autoRecordSignal={autoRecordSignal}
+                    onText={(text) => {
+                      if (phoneModeRef.current) {
+                        // 电话模式：识别即自动发送，无需手动点发送
+                        void submitTurn(text);
+                      } else {
+                        setTypedText((current) => current.trim() ? current.trim() + " " + text : text);
+                      }
+                    }}
+                    onVoiceMessage={(blob, durationMs) => void handleVoiceMessage(blob, durationMs)}
+                  />
+                  <PrimaryButton disabled={isSubmitting || !typedText.trim()} onClick={() => submitTurn(typedText)}>
+                    {isSubmitting ? "发送中…" : "发送"}
+                  </PrimaryButton>
+                </div>
+              )}
             </div>
           </section>
         </div>
@@ -1181,26 +1549,242 @@ export function PracticeRoom({ day, scenario, todayStrategy, profileId, learning
         <aside className="feedback-sidebar" aria-label="实时纠错" onScroll={handleFeedbackScroll}>
           <p className="section-label">实时纠错</p>
           <div className="feedback-list">
-            {feedbackTimeline.length > 0 ? (
-              feedbackTimeline.map((item) => (
-                item.kind === "feedback" ? (
-                  <FeedbackCard item={item.item} key={item.id} onLocate={locateTurn} />
-                ) : (
-                  <div
-                    className="language-support-dock"
-                    key={item.id}
-                  >
-                    <LanguageSupportCard result={item.result} />
-                  </div>
-                )
-              ))
-            ) : (
-              <p className="feedback-item">发送第一句后，这里会显示纠错和表达建议。</p>
-            )}
+            <FeedbackList items={feedbackTimeline} onLocate={locateTurn} />
             <div ref={feedbackEndRef} />
           </div>
         </aside>
       </section>
+
+      {isMobile && feedbackOpen ? (
+        <section
+          className="m-float"
+          role="dialog"
+          aria-label="实时纠错"
+          style={{ left: `${feedbackPos.x}px`, top: `${feedbackPos.y}px` }}
+        >
+          <header
+            className="m-float-head"
+            onPointerDown={handleFloatDown}
+            onPointerMove={handleFloatMove}
+            onPointerUp={handleFloatUp}
+            onPointerCancel={handleFloatUp}
+          >
+            <span className="m-float-grip" aria-hidden="true" />
+            <strong>实时纠错</strong>
+            <button
+              type="button"
+              className="m-float-close"
+              aria-label="关闭"
+              onPointerDown={(event) => event.stopPropagation()}
+              onClick={() => setFeedbackOpen(false)}
+            >
+              ✕
+            </button>
+          </header>
+          <div className="m-float-body">
+            <FeedbackList items={feedbackTimeline} onLocate={locateTurn} />
+          </div>
+        </section>
+      ) : null}
+
+      {isMobile && voiceToast ? (
+        <div className="m-voice-toast" role="alert" onClick={() => setVoiceToast("")}>
+          {voiceToast}
+        </div>
+      ) : null}
+
+      {isMobile && recordingUi ? (
+        <div className="m-rec-overlay" role="status" aria-live="polite">
+          <span className="m-rec-dot" aria-hidden="true" />
+          <span className="m-rec-text">正在聆听</span>
+          <span className="m-rec-hint">松开发送 · 上滑取消</span>
+        </div>
+      ) : null}
+
+      {isMobile && historyOpen ? (
+        <div className="m-sheet-backdrop" onClick={() => setHistoryOpen(false)}>
+          <section
+            className="m-sheet"
+            role="dialog"
+            aria-label="最近对话"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <header className="m-sheet-head">
+              <strong>{replayTurns || replayLoading ? `${replayTitle} · 回放` : "最近对话"}</strong>
+              <button
+                type="button"
+                className="m-sheet-close"
+                onClick={() => {
+                  if (replayTurns || replayLoading) {
+                    setReplayTurns(null);
+                    setReplayLoading(false);
+                    return;
+                  }
+                  setHistoryOpen(false);
+                }}
+              >
+                {replayTurns || replayLoading ? "返回" : "关闭"}
+              </button>
+            </header>
+            <div className="m-sheet-body">
+              {replayLoading ? <p className="m-sheet-empty">加载中…</p> : null}
+              {replayTurns ? (
+                replayTurns.length === 0 ? (
+                  <p className="m-sheet-empty">这一轮没有可回放的内容。</p>
+                ) : (
+                  <div className="m-replay">
+                    {replayTurns.map((turn) => (
+                      <p
+                        key={turn.id}
+                        className={turn.speaker === "user" ? "m-replay-line m-replay-line-user" : "m-replay-line"}
+                      >
+                        <span className="m-replay-who">{turn.speaker === "user" ? "我" : "AI"}</span>
+                        {turn.text}
+                      </p>
+                    ))}
+                  </div>
+                )
+              ) : null}
+              {!replayTurns && !replayLoading ? (
+                <>
+                  {isLoadingHistory ? <p className="m-sheet-empty">加载中…</p> : null}
+                  {!isLoadingHistory && historyItems.length === 0 ? (
+                    <p className="m-sheet-empty">还没有练过的对话，先说一句试试。</p>
+                  ) : null}
+                  {historyItems.map((item) => (
+                    <button
+                      type="button"
+                      className="m-history-item m-history-item-btn"
+                      key={item.id}
+                      onClick={() => void openReplay(item)}
+                    >
+                      <span className="m-history-head">
+                        <strong>{scenarioZh(item)}</strong>
+                        {typeof item.score === "number" ? (
+                          <span className="m-history-score">{item.score} 分</span>
+                        ) : null}
+                      </span>
+                      <span className="m-history-summary">{historySummary(item)}</span>
+                      <span className="m-history-meta">
+                        {(item.ended_at || item.started_at || "").slice(0, 16).replace("T", " ")}
+                      </span>
+                    </button>
+                  ))}
+                </>
+              ) : null}
+            </div>
+          </section>
+        </div>
+      ) : null}
+
+      {isMobile && menuOpen ? (
+        <div className="m-sheet-backdrop" onClick={() => setMenuOpen(false)}>
+          <section
+            className="m-sheet"
+            role="dialog"
+            aria-label="菜单"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <header className="m-sheet-head">
+              <strong>菜单</strong>
+              <button type="button" className="m-sheet-close" onClick={() => setMenuOpen(false)}>
+                关闭
+              </button>
+            </header>
+            <div className="m-sheet-body">
+              <button
+                type="button"
+                className="m-sheet-item"
+                onClick={() => {
+                  setMenuOpen(false);
+                  togglePhoneMode();
+                }}
+              >
+                {phoneMode ? "退出电话模式" : "进入电话模式"}
+              </button>
+              {practiceBrief ? (
+                <button
+                  type="button"
+                  className="m-sheet-item"
+                  onClick={() => {
+                    setMenuOpen(false);
+                    setLessonPhase("learn");
+                  }}
+                >
+                  查看场景提示
+                </button>
+              ) : null}
+              {hasUserTurn && !isCompleted ? (
+                <button
+                  type="button"
+                  className="m-sheet-item"
+                  onClick={() => {
+                    setMenuOpen(false);
+                    setCompletingChoice("manual");
+                  }}
+                  disabled={isCompletingSession}
+                >
+                  {isCompletingSession ? "生成总结中…" : "结束练习并总结"}
+                </button>
+              ) : null}
+              {session ? (
+                <button
+                  type="button"
+                  className="m-sheet-item m-sheet-item-danger"
+                  onClick={() => {
+                    setMenuOpen(false);
+                    void handleClearSessionHistory();
+                  }}
+                  disabled={isClearingHistory}
+                >
+                  {isClearingHistory ? "删除中…" : "删除本次会话"}
+                </button>
+              ) : null}
+            </div>
+          </section>
+        </div>
+      ) : null}
+
+      {/* 结束确认面板：替代 window.confirm，手机 WebView 里原生弹窗可能不显示 */}
+      {completingChoice ? (
+        <div
+          className="confirm-overlay"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="confirm-title"
+          onClick={(event) => {
+            if (event.target === event.currentTarget) setCompletingChoice(null);
+          }}
+        >
+          <div className="confirm-card">
+            <h2 className="confirm-title" id="confirm-title">
+              结束这次练习？
+            </h2>
+            <p className="confirm-text">
+              {completingChoice === "agent_suggested"
+                ? "AI 认为今天的核心目标已经练到了。结束后会生成总结，这一轮不能继续对话。"
+                : "结束后会生成本次总结并计入练习记录，这一轮不能再继续说下去。"}
+            </p>
+            <div className="confirm-actions">
+              <button
+                type="button"
+                className="confirm-btn confirm-btn-primary"
+                disabled={isCompletingSession}
+                onClick={() => void performCompleteSession(completingChoice)}
+              >
+                {isCompletingSession ? "生成总结中…" : "结束并生成总结"}
+              </button>
+              <button
+                type="button"
+                className="confirm-btn confirm-btn-ghost"
+                onClick={() => setCompletingChoice(null)}
+              >
+                继续练习
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </main>
   );
 }

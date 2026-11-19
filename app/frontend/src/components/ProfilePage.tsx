@@ -1,26 +1,41 @@
 import { useEffect, useState } from "react";
 import { getFavorites, getSessionHistory } from "../api";
 import type { Profile, Scenario, SessionHistoryItem } from "../types";
-import { PageHeader, SecondaryButton } from "./ui";
+import { SecondaryButton } from "./ui";
 
 type Props = {
   profile: Profile;
   onSelectScenario: (scenario: Scenario) => void;
+  onNavigate?: (view: "growth" | "settings") => void;
 };
 
 /** 折叠预览条数：收藏显示前 3 条、练习记录显示前 5 条，超出部分点击展开 */
 const FAVORITES_PREVIEW = 3;
 const HISTORY_PREVIEW = 5;
 
+/** 场景中文名 */
+const SCENARIO_ZH: Record<string, string> = {
+  "airport-check-in": "机场值机",
+  "hotel-check-in": "酒店入住",
+  "restaurant-order": "餐厅点餐",
+  "job-interview": "面试沟通",
+  "doctor-visit": "就医问诊",
+  "shopping-return": "购物退换",
+  free_talk: "自由对话",
+};
+
 function formatTime(value: string) {
   return value ? value.replace("T", " ").slice(0, 16) : "";
 }
 
-export function ProfilePage({ profile, onSelectScenario }: Props) {
+export function ProfilePage({ profile, onSelectScenario, onNavigate }: Props) {
   const [favorites, setFavorites] = useState<Scenario[]>([]);
   const [history, setHistory] = useState<SessionHistoryItem[]>([]);
   const [favoritesExpanded, setFavoritesExpanded] = useState(false);
   const [historyExpanded, setHistoryExpanded] = useState(false);
+  const [tab, setTab] = useState<"learn" | "pref">("learn");
+  // 详情子页：列表只放一行入口，点进去才展开明细
+  const [detail, setDetail] = useState<"history" | "favorites" | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -48,88 +63,145 @@ export function ProfilePage({ profile, onSelectScenario }: Props) {
 
   return (
     <main className="page">
-      <PageHeader
-        eyebrow="个人中心"
-        title="我的"
-        description={`${profile.learning_goal} · ${profile.current_level}`}
-      />
+      <header className="m-profile-head">
+        <div className="m-seg" role="tablist" aria-label="我的">
+          <button
+            type="button"
+            role="tab"
+            aria-selected={tab === "learn"}
+            className={tab === "learn" ? "m-seg-item m-seg-item-on" : "m-seg-item"}
+            onClick={() => setTab("learn")}
+          >
+            我的学习
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={tab === "pref"}
+            className={tab === "pref" ? "m-seg-item m-seg-item-on" : "m-seg-item"}
+            onClick={() => setTab("pref")}
+          >
+            学习偏好
+          </button>
+        </div>
+        <p className="m-profile-sub">{profile.learning_goal} · {profile.current_level}</p>
+      </header>
+
+      {tab === "learn" ? (
+        detail ? (
+          <section className="profile-layout">
+            <div className="profile-column">
+              <section className="profile-card">
+                <div className="profile-detail-head">
+                  <button type="button" className="profile-detail-back" onClick={() => setDetail(null)}>
+                    ← 返回
+                  </button>
+                  <strong>{detail === "history" ? "练习记录" : "收藏的场景"}</strong>
+                </div>
+                {detail === "history" ? (
+                  history.length === 0 ? (
+                    <p className="muted">还没有练习记录，开始第一次对话吧。</p>
+                  ) : (
+                    <ul className="profile-history-list">
+                      {history.map((item) => (
+                        <li key={item.id} className="profile-history-row">
+                          <div>
+                            <strong>{SCENARIO_ZH[item.scenario_id ?? ""] ?? item.topic}</strong>
+                            <span>
+                              {formatTime(item.started_at)} · {item.turn_count} 轮 · 难度 {item.difficulty ?? "—"}
+                              {item.score != null ? (
+                                <span className="profile-history-score"> · 得分 {item.score}/100</span>
+                              ) : null}
+                            </span>
+                          </div>
+                        </li>
+                      ))}
+                    </ul>
+                  )
+                ) : favorites.length === 0 ? (
+                  <p className="muted">还没有收藏场景，去场景页点星标即可收藏。</p>
+                ) : (
+                  <ul className="profile-scenario-list">
+                    {favorites.map((scenario) => (
+                      <li key={scenario.id} className="profile-scenario-row">
+                        <div>
+                          <strong>{SCENARIO_ZH[scenario.id] ?? scenario.title}</strong>
+                          <span>{scenario.category} · {scenario.difficulty?.level ?? "A2"}</span>
+                        </div>
+                        <SecondaryButton type="button" onClick={() => onSelectScenario(scenario)}>
+                          开始
+                        </SecondaryButton>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </section>
+            </div>
+          </section>
+        ) : (
+          <section className="profile-layout">
+            <div className="profile-column">
+              <section className="profile-card" aria-label="我的学习">
+                <ul className="m-list">
+                  <li className="m-row">
+                    <button type="button" className="m-row-btn" onClick={() => setDetail("history")}>
+                      <span className="m-row-label">练习记录</span>
+                      <span className="m-row-right">
+                        <span className="m-row-value">{history.length} 条</span>
+                        <span className="m-row-chevron" aria-hidden="true">›</span>
+                      </span>
+                    </button>
+                  </li>
+                  <li className="m-row">
+                    <button type="button" className="m-row-btn" onClick={() => setDetail("favorites")}>
+                      <span className="m-row-label">收藏的场景</span>
+                      <span className="m-row-right">
+                        <span className="m-row-value">{favorites.length} 个</span>
+                        <span className="m-row-chevron" aria-hidden="true">›</span>
+                      </span>
+                    </button>
+                  </li>
+                </ul>
+              </section>
+            </div>
+          </section>
+        )
+      ) : (
+        <section className="profile-layout">
+          <div className="profile-column">
+            <section className="profile-card" aria-label="偏好">
+              <ul className="m-list">
+                <li className="m-row">
+                  <span className="m-row-label">学习目标</span>
+                  <span className="m-row-value">{profile.learning_goal}</span>
+                </li>
+                <li className="m-row">
+                  <span className="m-row-label">当前水平</span>
+                  <span className="m-row-value">{profile.current_level}</span>
+                </li>
+              </ul>
+            </section>
+          </div>
+        </section>
+      )}
 
       <section className="profile-layout">
         <div className="profile-column">
-          <section className="profile-card" aria-label="收藏">
-            <div className="profile-card-header">
-              <p className="section-label">收藏</p>
-              <h2>收藏的场景</h2>
-            </div>
-            {favorites.length === 0 ? (
-              <p className="muted">还没有收藏场景，去场景页点星标即可收藏。</p>
-            ) : (
-              <>
-                <ul className="profile-scenario-list">
-                  {visibleFavorites.map((scenario) => (
-                    <li key={scenario.id} className="profile-scenario-row">
-                      <div>
-                        <strong>{scenario.title}</strong>
-                        <span>{scenario.npc_role} · {scenario.difficulty?.level ?? "A2"}</span>
-                      </div>
-                      <SecondaryButton type="button" onClick={() => onSelectScenario(scenario)}>
-                        开始
-                      </SecondaryButton>
-                    </li>
-                  ))}
-                </ul>
-                {favorites.length > FAVORITES_PREVIEW ? (
-                  <button
-                    type="button"
-                    className="profile-collapse-toggle"
-                    aria-expanded={favoritesExpanded}
-                    onClick={() => setFavoritesExpanded((value) => !value)}
-                  >
-                    {favoritesExpanded ? "收起" : `展开全部（${favorites.length}）`}
-                  </button>
-                ) : null}
-              </>
-            )}
-          </section>
-
-          <section className="profile-card" aria-label="历史对话场景">
-            <div className="profile-card-header">
-              <p className="section-label">历史对话场景</p>
-              <h2>练习记录</h2>
-            </div>
-            {history.length === 0 ? (
-              <p className="muted">还没有练习记录，开始第一次对话吧。</p>
-            ) : (
-              <>
-                <ul className="profile-history-list">
-                  {visibleHistory.map((item) => (
-                    <li key={item.id} className="profile-history-row">
-                      <div>
-                        <strong>{item.topic}</strong>
-                        <span>
-                          {formatTime(item.started_at)} · {item.turn_count} 轮 · 难度 {item.difficulty ?? "—"}
-                          {item.score != null ? (
-                            <span className="profile-history-score"> · 得分 {item.score}/100</span>
-                          ) : null}
-                          {" · "}
-                          {item.ended_at ? "已结束" : "进行中"}
-                        </span>
-                      </div>
-                    </li>
-                  ))}
-                </ul>
-                {history.length > HISTORY_PREVIEW ? (
-                  <button
-                    type="button"
-                    className="profile-collapse-toggle"
-                    aria-expanded={historyExpanded}
-                    onClick={() => setHistoryExpanded((value) => !value)}
-                  >
-                    {historyExpanded ? "收起" : `展开全部（${history.length}）`}
-                  </button>
-                ) : null}
-              </>
-            )}
+          <section className="profile-card" aria-label="更多">
+            <ul className="m-list">
+              <li className="m-row">
+                <button type="button" className="m-row-btn" onClick={() => onNavigate?.("growth")}>
+                  <span className="m-row-label">成长报告</span>
+                  <span className="m-row-chevron" aria-hidden="true">›</span>
+                </button>
+              </li>
+              <li className="m-row">
+                <button type="button" className="m-row-btn" onClick={() => onNavigate?.("settings")}>
+                  <span className="m-row-label">设置</span>
+                  <span className="m-row-chevron" aria-hidden="true">›</span>
+                </button>
+              </li>
+            </ul>
           </section>
         </div>
       </section>

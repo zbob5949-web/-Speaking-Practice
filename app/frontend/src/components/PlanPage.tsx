@@ -13,6 +13,27 @@ const CATEGORY_TINTS: Record<string, string> = {
   "购物": "linear-gradient(135deg, #fdf3d0 0%, #fff8e8 100%)",
 };
 
+/** 场景中文名与一句话介绍：列表只展示这两项，详情进对话页再看 */
+const SCENARIO_ZH: Record<string, string> = {
+  "airport-check-in": "机场值机",
+  "hotel-check-in": "酒店入住",
+  "restaurant-order": "餐厅点餐",
+  "job-interview": "面试沟通",
+  "doctor-visit": "就医问诊",
+  "shopping-return": "购物退换",
+  free_talk: "自由对话",
+};
+
+const SCENARIO_INTRO_ZH: Record<string, string> = {
+  "airport-check-in": "值机、托运行李与航班延误沟通",
+  "hotel-check-in": "入住登记、预订确认与客房需求",
+  "restaurant-order": "点餐、忌口说明与菜品变化应对",
+  "job-interview": "自我介绍、岗位问答与追问",
+  "doctor-visit": "描述症状、回答问诊与取药",
+  "shopping-return": "退换货理由、凭证与售后协商",
+  free_talk: "不限话题，自由聊天",
+};
+
 function scenarioLevelRange(scenario: Scenario): string {
   const levels = (scenario.bands ?? []).map((band) => band.level).filter(Boolean);
   if (levels.length === 0) return scenario.difficulty?.level ?? "";
@@ -37,6 +58,8 @@ export function PlanPage({ profileId, activeScenarioId, onStartScenario, onStart
   const [tier, setTier] = useState("");
   const [learningPath, setLearningPath] = useState<LearningPath | null>(null);
   const [pathLoading, setPathLoading] = useState(false);
+  // 「没有明确想法？」默认收起，点开才出现详细内容
+  const [pathOpen, setPathOpen] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -146,7 +169,7 @@ export function PlanPage({ profileId, activeScenarioId, onStartScenario, onStart
         <>
           <section className="scenario-filters" aria-label="场景筛选">
             <label className="scenario-filter">
-              <span>背景设定</span>
+              <span>背景</span>
               <select value={category} onChange={(event) => setCategory(event.target.value)}>
                 <option value="">全部</option>
                 {catalog.categories.map((item) => (
@@ -155,7 +178,7 @@ export function PlanPage({ profileId, activeScenarioId, onStartScenario, onStart
               </select>
             </label>
             <label className="scenario-filter">
-              <span>角色描述</span>
+              <span>角色</span>
               <select value={role} onChange={(event) => setRole(event.target.value)}>
                 <option value="">全部</option>
                 {catalog.roles.map((item) => (
@@ -164,7 +187,7 @@ export function PlanPage({ profileId, activeScenarioId, onStartScenario, onStart
               </select>
             </label>
             <label className="scenario-filter">
-              <span>难度分级</span>
+              <span>难度</span>
               <select value={tier} onChange={(event) => setTier(event.target.value)}>
                 <option value="">全部</option>
                 {catalog.tiers.map((item) => (
@@ -175,28 +198,38 @@ export function PlanPage({ profileId, activeScenarioId, onStartScenario, onStart
           </section>
 
           <section className="learning-path-block" aria-label="学习路线">
-            <div className="learning-path-header">
+            <button
+              type="button"
+              className="learning-path-header learning-path-toggle"
+              aria-expanded={pathOpen}
+              onClick={() => setPathOpen((value) => !value)}
+            >
               <div>
                 <p className="section-label">没有明确想法？</p>
                 <h2>按水平生成学习路线</h2>
-                <p className="muted">选择你的水平，为你排好由易到难的练习顺序。</p>
               </div>
-            </div>
-            <div className="learning-path-tiers">
-              {catalog.tiers.map((item) => (
-                <button
-                  className={learningPath?.tier === item.id ? "path-tier path-tier-active" : "path-tier"}
-                  key={item.id}
-                  type="button"
-                  disabled={pathLoading}
-                  onClick={() => void generatePath(item.id)}
-                >
-                  {item.label}
-                  <small>{item.levels.join(" / ")}</small>
-                </button>
-              ))}
-            </div>
-            {learningPath ? (
+              <span className="learning-path-chevron" aria-hidden="true">{pathOpen ? "收起" : "展开"}</span>
+            </button>
+            {pathOpen ? (
+              <>
+                <p className="muted learning-path-intro">选择你的水平，为你排好由易到难的练习顺序。</p>
+                <div className="learning-path-tiers">
+                  {catalog.tiers.map((item) => (
+                    <button
+                      className={learningPath?.tier === item.id ? "path-tier path-tier-active" : "path-tier"}
+                      key={item.id}
+                      type="button"
+                      disabled={pathLoading}
+                      onClick={() => void generatePath(item.id)}
+                    >
+                      {item.label}
+                      <small>{item.levels.join(" / ")}</small>
+                    </button>
+                  ))}
+                </div>
+              </>
+            ) : null}
+            {pathOpen && learningPath ? (
               <div className="learning-path-cards">
                 {learningPath.path.map((scenario, index) => (
                   <button
@@ -239,43 +272,13 @@ export function PlanPage({ profileId, activeScenarioId, onStartScenario, onStart
                 onClick={() => onStartScenario(scenario)}
                 aria-pressed={scenario.id === activeScenarioId}
               >
-                <div
-                  className="scenario-tile-media"
-                  aria-hidden="true"
-                  style={{
-                    backgroundImage: SCENARIO_IMAGES[scenario.id]
-                      ? `url("${SCENARIO_IMAGES[scenario.id]}")`
-                      : CATEGORY_TINTS[scenario.category] ?? undefined,
-                  }}
-                />
-                <span
-                  className={scenario.is_favorite ? "scenario-favorite-btn scenario-favorite-btn-active" : "scenario-favorite-btn"}
-                  role="button"
-                  tabIndex={0}
-                  aria-label={scenario.is_favorite ? "取消收藏" : "收藏"}
-                  onClick={(event) => {
-                    event.stopPropagation();
-                    void toggleFavorite(scenario);
-                  }}
-                  onKeyDown={(event) => {
-                    if (event.key === "Enter" || event.key === " ") {
-                      event.preventDefault();
-                      event.stopPropagation();
-                      void toggleFavorite(scenario);
-                    }
-                  }}
-                >
-                  {scenario.is_favorite ? "已收藏" : "收藏"}
-                </span>
                 <div className="scenario-tile-body">
                   <div className="scenario-tile-meta">
                     <span className="scenario-level">{scenario.difficulty?.level ?? "A2"}</span>
-                    <span className="scenario-level-range">全难度 {scenarioLevelRange(scenario)}</span>
-                    <span className="scenario-tile-role">{scenario.category} · {scenario.npc_role}</span>
+                    <span className="scenario-tile-role">{scenario.category}</span>
                   </div>
-                  <strong>{scenario.title}</strong>
-                  <p>{scenario.background}</p>
-                  <small>{scenario.objective}</small>
+                  <strong>{SCENARIO_ZH[scenario.id] ?? scenario.title}</strong>
+                  <p className="scenario-tile-intro">{SCENARIO_INTRO_ZH[scenario.id] ?? ""}</p>
                 </div>
               </button>
             ))}
@@ -292,3 +295,4 @@ export function PlanPage({ profileId, activeScenarioId, onStartScenario, onStart
     </main>
   );
 }
+
