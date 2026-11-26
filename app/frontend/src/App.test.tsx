@@ -1,11 +1,13 @@
 import React from "react";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, expect, test, vi, type Mock } from "vitest";
-import { addFavorite, authGuest, authLogin, authRegister, clearAuth, completeSession, createOnboarding, deleteTurnPair, getCurrentLearningState, getFavorites, getGrowthSummary, getLearningPath, getProfiles, getPrompts, getScenarios, getSelectedVoice, getSessionHistory, getTTSVoices, getTodayStrategy, hasAuth, playAudioFromUrl, playTTS, removeFavorite, runDueReviews, requestLanguageSupport, sendUserTurnStream, setSelectedVoice, startScenarioSession, startSession, stopActiveAudio, storeAuth, transcribeAudio, translateText, updatePrompt } from "./api";
+import { getAccount, saveAccount, addFavorite, authGuest, authLogin, authRegister, clearAuth, completeSession, createOnboarding, deleteTurnPair, getCurrentLearningState, getFavorites, getGrowthSummary, getLearningPath, getProfiles, getPrompts, getScenarios, getSelectedVoice, getSessionHistory, getTTSVoices, getTodayStrategy, hasAuth, playAudioFromUrl, playTTS, removeFavorite, runDueReviews, requestLanguageSupport, sendUserTurnStream, setSelectedVoice, startScenarioSession, startSession, stopActiveAudio, storeAuth, transcribeAudio, translateText, updatePrompt } from "./api";
 import App from "./App";
 
 vi.mock("./api", () => ({
   UNAUTHORIZED_EVENT: "speakmate:unauthorized",
+  getAccount: vi.fn(),
+  saveAccount: vi.fn(),
   addFavorite: vi.fn(),
   removeFavorite: vi.fn(),
   authLogin: vi.fn(),
@@ -67,6 +69,8 @@ const mockCatalog = {
 };
 
 beforeEach(() => {
+  (getAccount as Mock).mockResolvedValue({ username: "英语学习者", avatar: "fox", avatars: { fox: "🦊", cat: "🐱" }, is_guest: false });
+  (saveAccount as Mock).mockResolvedValue({ username: "英语学习者", avatar: "fox", avatars: { fox: "🦊", cat: "🐱" }, is_guest: false });
   vi.resetAllMocks();
   localStorage.setItem("speakmate-token", "test-token");
   localStorage.removeItem("speakmate-last-scenario");

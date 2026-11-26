@@ -2,6 +2,7 @@
 from fastapi import APIRouter, HTTPException
 
 from app import dependencies as deps
+from app.services import account
 from app.scenarios import TIER_LEVELS, get_scenario, learning_path, list_categories, list_roles, list_scenarios, tier_for_level
 
 router = APIRouter()
@@ -42,11 +43,9 @@ def scenarios(
             band = next((b for b in item["bands"] if b["level"] in codes), None)
             if band:
                 item["difficulty"] = band
-    if profile_id:
-        repo = deps.get_repository()
-        favorites = {item["scenario_id"] for item in repo.list_favorites(profile_id)}
-        for item in items:
-            item["is_favorite"] = item["id"] in favorites
+    favorites = {item["scenario_id"] for item in account.favorite_rows()}
+    for item in items:
+        item["is_favorite"] = item["id"] in favorites
     derived_tier = tier or (tier_for_level(profile_level) if profile_level else None)
     return {
         "scenarios": items,

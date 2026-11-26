@@ -336,7 +336,7 @@ class CoachRepository:
             ).fetchone()
             return row is not None
 
-    def add_turn(self, session_id: int, speaker: str, text: str) -> dict[str, Any]:
+    def add_turn(self, session_id: int, speaker: str, text: str, input_mode: str = "text") -> dict[str, Any]:
         with connect(self.db_path) as connection:
             row = connection.execute(
                 "SELECT COALESCE(MAX(turn_index), 0) AS max_index FROM conversation_turns WHERE session_id = ?",
@@ -344,8 +344,8 @@ class CoachRepository:
             ).fetchone()
             turn_index = int(row["max_index"]) + 1
             cursor = connection.execute(
-                "INSERT INTO conversation_turns (session_id, turn_index, speaker, text) VALUES (?, ?, ?, ?)",
-                (session_id, turn_index, speaker, text),
+                "INSERT INTO conversation_turns (session_id, turn_index, speaker, text, input_mode) VALUES (?, ?, ?, ?, ?)",
+                (session_id, turn_index, speaker, text, input_mode),
             )
             saved = connection.execute("SELECT * FROM conversation_turns WHERE id = ?", (cursor.lastrowid,)).fetchone()
             return row_to_dict(saved)

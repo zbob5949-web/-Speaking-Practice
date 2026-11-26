@@ -125,3 +125,22 @@ def test_conversation_prompt_defines_npc_role_boundary_in_chinese():
     assert "NPC 台词" in llm.last_system
     assert "隐藏练习目标" in llm.last_user
     assert "不要把目标复述给用户" in llm.last_user
+
+
+def test_stream_emits_first_character_before_hints_or_stream_completion():
+    class StreamingProvider:
+        def stream_complete(self, system_prompt, user_prompt):
+            assert '先输出 "reply"' in system_prompt
+            yield '{"reply":"H'
+            yield 'ello'
+            yield '\\n'
+            yield '\\u4f60'
+            yield '\\ud83d'
+            yield '\\ude00'
+            yield '","hints":["提示"]}'
+    result = ConversationAgent(StreamingProvider()).reply_stream(
+        topic="Travel", objective="Practice", user_level="A2", learning_goal="English", conversation=[])
+    assert next(result) == "H"
+    rest = list(result)
+    assert "".join(item for item in rest if isinstance(item, str)) == "ello\n你😀"
+    assert rest[-1] == ["提示"]

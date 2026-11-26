@@ -25,6 +25,7 @@ class StartSessionRequest(BaseModel):
 
 
 class UserTurnRequest(BaseModel):
+    input_mode: Literal["text", "voice"] = "text"
     session_id: int
     text: str = Field(min_length=1)
 

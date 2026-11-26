@@ -345,6 +345,8 @@ class ConversationAgent:
                 f"{practice_brief_context}\n"
             )
         
+        # Put visible dialogue before coaching hints to minimize time to first text.
+        system_prompt += '\n输出 JSON 时必须先输出 "reply"，再输出 "hints"；立即开始 NPC 台词，不要在正文前生成提示列表或分析。'
         stream = self.llm.stream_complete(system_prompt=system_prompt, user_prompt=user_prompt)
         
         buffer = ""
@@ -380,22 +382,37 @@ class ConversationAgent:
                     buffer = buffer[match.end():]
             
             if in_reply:
+                # Emit every complete character, retaining only incomplete JSON escapes.
                 i = 0
+                decoded = []
                 while i < len(buffer):
-                    if buffer[i] == '\\':
-                        i += 2
-                        continue
-                    if buffer[i] == '"':
-                        yield buffer[:i].replace('\\"', '"').replace('\\n', '\n')
-                        buffer = buffer[i:]
+                    char = buffer[i]
+                    if char == '"':
                         in_reply = False
+                        i += 1
                         break
-                    i += 1
-                
-                if in_reply and len(buffer) > 2:
-                    yield buffer[:-2].replace('\\"', '"').replace('\\n', '\n')
-                    buffer = buffer[-2:]
-                    
+                    if char == '\\':
+                        if i + 1 >= len(buffer):
+                            break
+                        end = i + (6 if buffer[i + 1] == 'u' else 2)
+                        if end > len(buffer):
+                            break
+                        if buffer[i + 1] == 'u':
+                            code = int(buffer[i + 2:end], 16)
+                            if 0xD800 <= code <= 0xDBFF:
+                                if end + 6 > len(buffer):
+                                    break
+                                end += 6
+                        import json
+                        decoded.append(json.loads('"' + buffer[i:end] + '"'))
+                        i = end
+                    else:
+                        decoded.append(char)
+                        i += 1
+                buffer = buffer[i:]
+                if decoded:
+                    yield "".join(decoded)
+
         # Fallback if "reply" was never found in JSON
         if is_json and not match_found:
             try:

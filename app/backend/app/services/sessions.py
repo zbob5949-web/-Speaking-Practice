@@ -354,7 +354,7 @@ def add_user_turn(request: UserTurnRequest) -> dict[str, object]:
     repo = deps.get_repository()
 
     # 1. Save user turn
-    user_turn = repo.add_turn(request.session_id, "user", request.text)
+    user_turn = repo.add_turn(request.session_id, "user", request.text, input_mode=request.input_mode)
     turns = repo.get_turns(request.session_id)
 
     # 2. Fetch context
@@ -386,7 +386,7 @@ def add_user_turn(request: UserTurnRequest) -> dict[str, object]:
     assistant_text = agent_response["reply"]
     hints = agent_response["hints"]
 
-    assistant_turn = repo.add_turn(request.session_id, "assistant", assistant_text)
+    assistant_turn = repo.add_turn(request.session_id, "assistant", assistant_text, input_mode=request.input_mode)
 
     # 4. Feedback
     feedback = InlineFeedbackAgent(llm, repo.get_prompt).generate(
@@ -424,7 +424,7 @@ def stream_user_turn(request: UserTurnRequest):
         raise HTTPException(status_code=404, detail="Session not found")
 
     # 1. Save user turn
-    user_turn = repo.add_turn(request.session_id, "user", request.text)
+    user_turn = repo.add_turn(request.session_id, "user", request.text, input_mode=request.input_mode)
     turns = repo.get_turns(request.session_id)
 
     # 2. Fetch context
@@ -474,7 +474,7 @@ def stream_user_turn(request: UserTurnRequest):
                 hints = item
 
         # 5. Save assistant turn
-        assistant_turn = repo.add_turn(request.session_id, "assistant", full_reply.strip())
+        assistant_turn = repo.add_turn(request.session_id, "assistant", full_reply.strip(), input_mode=request.input_mode)
 
         # 6. Wait for feedback to complete (it should be ready by now)
         try:

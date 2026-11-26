@@ -6,6 +6,7 @@ type Props = {
   profileId?: number;
   onStart: () => void;
   onReview: () => void;
+  onSettings?: () => void;
 };
 
 /** 场景中文名（主页最近一次练习用） */
@@ -19,7 +20,7 @@ const SCENARIO_ZH: Record<string, string> = {
   free_talk: "自由对话",
 };
 
-export function HomePage({ profileId, onStart, onReview }: Props) {
+export function HomePage({ profileId, onStart, onReview, onSettings }: Props) {
   const [history, setHistory] = useState<SessionHistoryItem[]>([]);
 
   useEffect(() => {
@@ -44,6 +45,7 @@ export function HomePage({ profileId, onStart, onReview }: Props) {
   return (
     <main className="home-page">
       <header className="home-hero">
+        <button type="button" className="home-settings-button" onClick={onSettings}>设置</button>
         <p className="home-eyebrow">场景口语陪练</p>
         <h1 className="home-title">SpeakMate</h1>
         <p className="home-sub">开口练一句，比背十句有用</p>

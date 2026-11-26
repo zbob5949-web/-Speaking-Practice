@@ -1,13 +1,24 @@
 """账号业务：users 表操作（注册、登录、查询）。"""
+from contextlib import contextmanager
+
 from app.config import load_settings
 from app.db import connect, init_db
 from app.security import hash_password, verify_password
 
 
+@contextmanager
 def _connection():
     settings = load_settings()
     init_db(settings.database_path)  # 确保 users 表已建
-    return connect(settings.database_path)
+    connection = connect(settings.database_path)
+    try:
+        yield connection
+        connection.commit()
+    except Exception:
+        connection.rollback()
+        raise
+    finally:
+        connection.close()
 
 
 def register_user(phone: str, password: str) -> dict:

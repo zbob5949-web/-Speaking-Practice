@@ -7,7 +7,7 @@ import time
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import FileResponse, JSONResponse
 
 # 兼容导出：enhanced_main_v2 与外部脚本可能引用这些名字
 from app.completion import build_completion_status, build_completion_summary  # noqa: F401
@@ -187,6 +187,28 @@ from pathlib import Path
 from fastapi.staticfiles import StaticFiles
 
 FRONTEND_DIST = Path(__file__).resolve().parents[3] / "app" / "frontend" / "dist"
+ADMIN_DIST = Path(__file__).resolve().parents[2] / "admin-dist"
+if ADMIN_DIST.exists():
+    @app.get("/admin-ui", include_in_schema=False)
+    def admin_redirect():
+        from fastapi.responses import RedirectResponse
+        return RedirectResponse("/admin-ui/")
+
+    @app.get("/admin-ui/", include_in_schema=False)
+    def admin_index():
+        return FileResponse(ADMIN_DIST / "index.html", headers={"Cache-Control": "no-store"})
+
+    app.mount("/admin-ui", StaticFiles(directory=ADMIN_DIST, html=True), name="admin-ui")
+
 if FRONTEND_DIST.exists():
+    # index.html 必须每次回源：它引用的是带哈希的 bundle 文件名，
+    # 一旦被浏览器启发式缓存，重新构建后页面仍会加载旧包（表现为「改了没变化」）。
+    @app.get("/", include_in_schema=False)
+    def frontend_index():
+        return FileResponse(
+            FRONTEND_DIST / "index.html",
+            headers={"Cache-Control": "no-cache, no-store, must-revalidate"},
+        )
+
     app.mount("/assets", StaticFiles(directory=FRONTEND_DIST / "assets"), name="assets")
     app.mount("/", StaticFiles(directory=FRONTEND_DIST, html=True), name="frontend")

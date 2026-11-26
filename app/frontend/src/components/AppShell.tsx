@@ -63,7 +63,7 @@ export function AppShell({ activeView, children, onNavigate, onLogout, onBack, c
   // 返回键：除首页外都显示（统一回首页）
   const showBack = activeView !== "home";
   return (
-    <div className={showNav ? "app-shell" : "app-shell app-shell-nonav"}>
+    <div className={`app-shell${showNav ? "" : " app-shell-nonav"} app-shell-view-${activeView}`}>
       {showBack && onBack ? (
         <button
           type="button"

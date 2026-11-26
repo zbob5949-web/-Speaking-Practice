@@ -1,3 +1,4 @@
+import { monitorAudio, prepareAudioMeter } from "./audioMeter";
 import type { ConversationTurn, ErrorReport, GrowthSummary, InlineFeedback, LanguageSupportMode, LanguageSupportResult, LearningPath, OnboardingResponse, PlanDay, PracticeBrief, PracticeSession, Profile, Scenario, ScenarioCatalog, SessionCompletion, SessionHistoryItem, TodayStrategy } from "./types";
 
 // 默认同源（页面与 API 同端口发布）：留空即用当前访问地址，
@@ -17,7 +18,7 @@ async function apiFetch(input: RequestInfo | URL, init: RequestInit = {}): Promi
   const headers = new Headers(init.headers);
   if (token) headers.set("Authorization", `Bearer ${token}`);
   const response = await window.fetch(input, { ...init, headers });
-  if (response.status === 401 && typeof input === "string" && !input.includes("/api/auth/")) {
+  if (response.status === 401 && typeof input === "string" && ![/\/api\/auth\/(login|register|guest|refresh)$/].some(pattern => pattern.test(input))) {
     clearAuth();
     // 通知界面层：令牌已失效，立刻回到登录页，避免停留在“界面在但操作全失败”的状态
     if (typeof window !== "undefined" && typeof window.dispatchEvent === "function") {
@@ -189,8 +190,8 @@ export async function getLearningPath(tier?: string, profileId?: number): Promis
   return response.json();
 }
 
-export async function addFavorite(scenarioId: string, profileId: number): Promise<{ status: string }> {
-  const response = await apiFetch(`${API_BASE}/api/favorites/${scenarioId}?profile_id=${profileId}`, {
+export async function addFavorite(scenarioId: string, profileId?: number): Promise<{ status: string }> {
+  const response = await apiFetch(`${API_BASE}/api/favorites/${scenarioId}${profileId ? `?profile_id=${profileId}` : ""}`, {
     method: "POST"
   });
   if (!response.ok) {
@@ -199,8 +200,8 @@ export async function addFavorite(scenarioId: string, profileId: number): Promis
   return response.json();
 }
 
-export async function removeFavorite(scenarioId: string, profileId: number): Promise<{ status: string; removed: boolean }> {
-  const response = await apiFetch(`${API_BASE}/api/favorites/${scenarioId}?profile_id=${profileId}`, {
+export async function removeFavorite(scenarioId: string, profileId?: number): Promise<{ status: string; removed: boolean }> {
+  const response = await apiFetch(`${API_BASE}/api/favorites/${scenarioId}${profileId ? `?profile_id=${profileId}` : ""}`, {
     method: "DELETE"
   });
   if (!response.ok) {
@@ -209,8 +210,8 @@ export async function removeFavorite(scenarioId: string, profileId: number): Pro
   return response.json();
 }
 
-export async function getFavorites(profileId: number): Promise<{ favorites: Scenario[] }> {
-  const response = await apiFetch(`${API_BASE}/api/favorites?profile_id=${profileId}`);
+export async function getFavorites(profileId?: number): Promise<{ favorites: Scenario[] }> {
+  const response = await apiFetch(`${API_BASE}/api/favorites${profileId ? `?profile_id=${profileId}` : ""}`);
   if (!response.ok) {
     throw new Error("Failed to load favorites");
   }
@@ -294,6 +295,9 @@ export function storeAuth(result: AuthResult): void {
 export function clearAuth(): void {
   localStorage.removeItem("speakmate-token");
   localStorage.removeItem("speakmate-refresh-token");
+  try {
+    Object.keys(sessionStorage).filter(key => key.startsWith("speakmate-chat:")).forEach(key => sessionStorage.removeItem(key));
+  } catch { /* Storage may be unavailable. */ }
 }
 
 export function hasAuth(): boolean {
@@ -303,7 +307,8 @@ export function hasAuth(): boolean {
 export async function sendUserTurnStream(
   sessionId: number,
   text: string,
-  onTextChunk: (chunk: string) => void
+  onTextChunk: (chunk: string) => void,
+  inputMode: "text" | "voice" = "text"
 ): Promise<{
   user_turn: ConversationTurn;
   assistant_turn: ConversationTurn;
@@ -318,7 +323,7 @@ export async function sendUserTurnStream(
   const response = await apiFetch(`${API_BASE}/api/sessions/turn/stream`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ session_id: sessionId, text }),
+    body: JSON.stringify({ session_id: sessionId, text, input_mode: inputMode }),
   });
 
   if (!response.ok || !response.body) {
@@ -333,30 +338,32 @@ export async function sendUserTurnStream(
   let buffer = "";
   let meta: any = null;
 
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    
-    buffer += decoder.decode(value, { stream: true });
-    const lines = buffer.split("\n\n");
-    buffer = lines.pop() || ""; // Keep the last incomplete part in the buffer
-    
-    for (const line of lines) {
-      if (line.startsWith("data: ")) {
-        try {
-          const data = JSON.parse(line.slice(6));
-          if (data.type === "text") {
-            onTextChunk(data.content);
-          } else if (data.type === "meta") {
-            meta = data;
-          }
-        } catch (e) {
-          // ignore incomplete json
-        }
+  function consumeEvent(event: string) {
+    const payload = event.split("\n").filter(line => line.startsWith("data:")).map(line => line.slice(5).trimStart()).join("\n");
+    if (!payload || payload === "[DONE]") return;
+    let data;
+    try { data = JSON.parse(payload); } catch { return; }
+    if (data.type === "text") onTextChunk(data.content);
+    else if (data.type === "meta") meta = data;
+    else if (data.type === "error") throw new Error(data.message || "回复生成失败");
+  }
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      buffer += done ? decoder.decode() : decoder.decode(value, { stream: true });
+      // SSE supports LF and CRLF. Consume each complete event as it arrives.
+      let boundary;
+      while ((boundary = /\r?\n\r?\n/.exec(buffer))) {
+        consumeEvent(buffer.slice(0, boundary.index).replace(/\r\n/g, "\n"));
+        buffer = buffer.slice(boundary.index + boundary[0].length);
+      }
+      if (done) {
+        if (buffer.trim()) consumeEvent(buffer.replace(/\r\n/g, "\n"));
+        break;
       }
     }
-  }
-  
+  } finally { reader.releaseLock(); }
+
   if (!meta) {
     // Resilience: If meta is missing (e.g. timeout on feedback generation), don't crash.
     // Return empty arrays so the text response is preserved.
@@ -455,6 +462,8 @@ export async function requestLanguageSupport(input: {
 }
 
 let activeAudio: HTMLAudioElement | null = null;
+let audioGeneration = 0;
+let stopAudioMeter: (() => void) | null = null;
 
 export type TTSVoice = {
   id: string;
@@ -488,6 +497,8 @@ export async function getTTSVoices(): Promise<{ voices: TTSVoice[]; default_voic
 
 /** 停止当前正在播放的任意音频（TTS / 语音条），用于切换界面时中断播放。 */
 export function stopActiveAudio(): void {
+  audioGeneration++;
+  stopAudioMeter?.(); stopAudioMeter = null;
   if (activeAudio) {
     activeAudio.pause();
     activeAudio = null;
@@ -499,9 +510,12 @@ export function playAudioFromUrl(url: string): Promise<void> {
   stopActiveAudio();
   const audio = new Audio(url);
   activeAudio = audio;
+  const stopMeter = monitorAudio(audio);
+  stopAudioMeter = stopMeter;
   return new Promise((resolve) => {
     const finish = () => {
-      if (activeAudio === audio) activeAudio = null;
+      stopMeter();
+      if (activeAudio === audio) { activeAudio = null; stopAudioMeter = null; }
       resolve();
     };
     audio.onended = finish;
@@ -512,6 +526,9 @@ export function playAudioFromUrl(url: string): Promise<void> {
 }
 
 export async function playTTS(text: string, voice?: string): Promise<void> {
+  prepareAudioMeter();
+  stopActiveAudio();
+  const generation = audioGeneration;
   const body: { text: string; voice?: string } = { text };
   if (voice) body.voice = voice;
   const response = await apiFetch(`${API_BASE}/api/tts`, {
@@ -523,24 +540,29 @@ export async function playTTS(text: string, voice?: string): Promise<void> {
     throw new Error("Failed to synthesize speech");
   }
   const blob = await response.blob();
+  if (generation !== audioGeneration) return;
   const url = URL.createObjectURL(blob);
   const audio = new Audio(url);
   activeAudio = audio;
+  const stopMeter = monitorAudio(audio);
+  stopAudioMeter = stopMeter;
 
   return new Promise((resolve, reject) => {
     const finish = () => {
-      if (activeAudio === audio) activeAudio = null;
+      stopMeter();
+      if (activeAudio === audio) { activeAudio = null; stopAudioMeter = null; }
       URL.revokeObjectURL(url);
       resolve();
     };
     audio.onended = finish;
     audio.onpause = finish;
     audio.onerror = (e) => {
-      if (activeAudio === audio) activeAudio = null;
+      stopMeter();
+      if (activeAudio === audio) { activeAudio = null; stopAudioMeter = null; }
       URL.revokeObjectURL(url);
       reject(e);
     };
-    audio.play().catch(reject);
+    audio.play().catch(error => { reject(error); finish(); });
   });
 }
 
@@ -557,5 +579,23 @@ export type AppVersionInfo = {
 export async function getAppVersion(): Promise<AppVersionInfo> {
   const response = await apiFetch(`${API_BASE}/api/app/version`);
   if (!response.ok) throw new Error("检查更新失败");
+  return response.json();
+}
+
+export type Account = { username: string; avatar: string; is_guest: boolean; avatars: Record<string, string> };
+export async function getAccount(): Promise<Account> {
+  const response = await apiFetch(`${API_BASE}/api/auth/me`);
+  if (!response.ok) {
+    if (response.status === 404) throw new Error("账号接口尚未更新，请重启后端后重试");
+    if (response.status === 429) throw new Error("请求较多，请稍后点击重新加载");
+    throw new Error("账号信息加载失败，请重试");
+  }
+  return response.json();
+}
+export async function saveAccount(username: string, avatar: string): Promise<Account> {
+  const response = await apiFetch(`${API_BASE}/api/auth/me`, {
+    method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ username, avatar }),
+  });
+  if (!response.ok) throw new Error("保存失败，请稍后重试");
   return response.json();
 }

@@ -203,6 +203,28 @@ def connect(db_path: Path) -> sqlite3.Connection:
 def init_db(db_path: Path) -> None:
     with connect(db_path) as connection:
         connection.executescript(SCHEMA)
+        turn_columns = {row[1] for row in connection.execute("PRAGMA table_info(conversation_turns)")}
+        if "input_mode" not in turn_columns:
+            connection.execute("ALTER TABLE conversation_turns ADD COLUMN input_mode TEXT NOT NULL DEFAULT 'text'")
+        columns = {row[1] for row in connection.execute("PRAGMA table_info(users)")}
+        for name, definition in (("username", "TEXT NOT NULL DEFAULT '英语学习者'"), ("avatar", "TEXT NOT NULL DEFAULT 'fox'")):
+            if name not in columns:
+                connection.execute(f"ALTER TABLE users ADD COLUMN {name} {definition}")
+        connection.executescript("""
+            CREATE TABLE IF NOT EXISTS account_preferences (
+                owner_key TEXT PRIMARY KEY,
+                username TEXT NOT NULL DEFAULT '英语学习者',
+                avatar TEXT NOT NULL DEFAULT 'fox'
+            );
+            CREATE TABLE IF NOT EXISTS account_favorites (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                owner_key TEXT NOT NULL,
+                profile_id INTEGER,
+                scenario_id TEXT NOT NULL,
+                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE(owner_key, scenario_id)
+            );
+        """)
         try:
             connection.execute("ALTER TABLE daily_sessions ADD COLUMN plan_day_id INTEGER")
             connection.commit()

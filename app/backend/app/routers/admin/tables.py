@@ -223,8 +223,18 @@ TABLES: dict[str, dict[str, Any]] = {
             col("created_at", "datetime", "创建时间", readonly=True),
         ],
     },
+    "account_favorites": {
+        "label": "账号场景收藏",
+        "columns": [
+            col("id", "int", "ID", readonly=True),
+            col("owner_key", "text", "用户手机号 / 游客ID", required=True, searchable=True),
+            col("scenario_id", "text", "场景ID", required=True, searchable=True),
+            col("profile_id", "int", "档案ID"),
+            col("created_at", "datetime", "收藏时间", readonly=True),
+        ],
+    },
     "favorites": {
-        "label": "场景收藏",
+        "label": "历史档案收藏",
         "columns": [
             col("id", "int", "ID", readonly=True),
             col("profile_id", "int", "档案ID", required=True),

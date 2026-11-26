@@ -7,7 +7,7 @@ from app.context import current_user_id
 
 
 class LLMProvider(Protocol):
-    def complete(self, system_prompt: str, user_prompt: str) -> str:
+    def complete(self, system_prompt: str, user_prompt: str, timeout: float = 30.0) -> str:
         ...
 
     def stream_complete(self, system_prompt: str, user_prompt: str) -> Iterator[str]:
@@ -15,8 +15,11 @@ class LLMProvider(Protocol):
 
 
 class FakeLLMProvider:
-    def complete(self, system_prompt: str, user_prompt: str) -> str:
+    def complete(self, system_prompt: str, user_prompt: str, timeout: float = 30.0) -> str:
         prompt_lower = system_prompt.lower()
+        if "english-to-chinese translator" in prompt_lower:
+            # Offline demo mode cannot translate arbitrary English reliably.
+            return ""
         asks_for_json_array = "json array" in prompt_lower or "json 数组" in prompt_lower
         asks_for_feedback = "feedback_type" in prompt_lower or "correction" in prompt_lower
         asks_for_plan = all(key in prompt_lower for key in ("topic", "scenario", "objective"))

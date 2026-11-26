@@ -1,10 +1,10 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { PageHeader } from "./ui";
-import { getAppVersion, getSelectedVoice, getTTSVoices, setSelectedVoice } from "../api";
+import { getAppVersion, getSelectedVoice, getTTSVoices, setSelectedVoice, playTTS, stopActiveAudio } from "../api";
 import type { TTSVoice } from "../api";
 import { APP_VERSION_CODE, APP_VERSION_NAME } from "../appVersion";
 
-export function SettingsPage() {
+export function SettingsPage({ onLogout }: { onLogout: () => void }) {
   const [updateStatus, setUpdateStatus] = useState("");
 
   const checkForUpdate = async () => {
@@ -33,6 +33,10 @@ export function SettingsPage() {
   const [defaultVoice, setDefaultVoice] = useState("");
   const [selectedVoice, setSelected] = useState<string | null>(() => getSelectedVoice());
   const [voiceError, setVoiceError] = useState("");
+  const [voicesOpen, setVoicesOpen] = useState(false);
+  const [previewVoice, setPreviewVoice] = useState<string | null>(null);
+  const previewRequest = useRef(0);
+  useEffect(() => () => { previewRequest.current++; stopActiveAudio(); }, []);
 
   useEffect(() => {
     getTTSVoices()
@@ -51,9 +55,15 @@ export function SettingsPage() {
     localStorage.setItem("speakmate-bilingual", next ? "on" : "off");
   }
 
-  function chooseVoice(voiceId: string) {
-    setSelected(voiceId);
-    setSelectedVoice(voiceId);
+  async function chooseVoice(voice: TTSVoice) {
+    setSelected(voice.id);
+    setSelectedVoice(voice.id);
+    setVoiceError("");
+    const request = ++previewRequest.current;
+    setPreviewVoice(voice.id);
+    try { await playTTS(`Hello, I am ${voice.name}.`, voice.id); }
+    catch { if (request === previewRequest.current) setVoiceError("试听失败，请再次点击音色重试。"); }
+    finally { if (request === previewRequest.current) setPreviewVoice(null); }
   }
 
   return (
@@ -92,10 +102,15 @@ export function SettingsPage() {
               <p className="section-label">陪练老师</p>
               <h2>音色</h2>
             </div>
-            <p className="muted">选择 AI 回复朗读时的声音，当前音色为默认选项。</p>
+            <button type="button" className="voice-picker-toggle" aria-expanded={voicesOpen} aria-controls="voice-options" onClick={() => setVoicesOpen(value => !value)}>
+              <span>当前音色：{voices.find(voice => voice.id === selectedVoice)?.name ?? "加载中…"}</span>
+              <span>{voicesOpen ? "收起音色 ▴" : "选择音色 ▾"}</span>
+            </button>
+            {voicesOpen ? <p className="muted">点击音色试听自我介绍，并设为陪练声音。</p> : null}
+            {previewVoice ? <p className="muted" role="status">正在试听 {voices.find(voice => voice.id === previewVoice)?.name}…</p> : null}
             {voiceError ? <p className="voice-error">{voiceError}</p> : null}
-            {voices.length > 0 ? (
-              <div className="voice-option-grid" role="radiogroup" aria-label="陪练老师音色">
+            {voicesOpen && voices.length > 0 ? (
+              <div id="voice-options" className="voice-option-grid" role="radiogroup" aria-label="陪练老师音色">
                 {voices.map((voice) => (
                   <button
                     key={voice.id}
@@ -103,7 +118,7 @@ export function SettingsPage() {
                     role="radio"
                     aria-checked={selectedVoice === voice.id}
                     className={selectedVoice === voice.id ? "voice-option voice-option-active" : "voice-option"}
-                    onClick={() => chooseVoice(voice.id)}
+                    onClick={() => void chooseVoice(voice)}
                   >
                     <span className="voice-option-name">
                       {voice.name}
@@ -116,6 +131,10 @@ export function SettingsPage() {
             ) : null}
           </section>
 
+          <section className="profile-card" aria-label="账号">
+            <h2>账号</h2>
+            <button type="button" className="settings-logout-button" onClick={onLogout}>退出登录</button>
+          </section>
           <section className="profile-card" aria-label="关于">
             <div className="profile-card-header">
               <p className="section-label">关于</p>

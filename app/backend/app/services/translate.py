@@ -1,4 +1,6 @@
 """对话双语展示：英文句子 → 中文翻译。"""
+from fastapi import HTTPException
+
 from app import dependencies as deps
 
 # 翻译是轻量请求：短超时(10s) + 一次重试，避免 DeepSeek 偶发慢请求
@@ -31,4 +33,6 @@ def translate(text: str) -> dict[str, object]:
                 break
         except Exception:  # pragma: no cover - LLM 不可用时双语功能降级
             translated = ""
+    if not translated:
+        raise HTTPException(status_code=503, detail="翻译暂不可用，请稍后重试")
     return {"text": text, "translation_zh": translated}

@@ -4,7 +4,9 @@ from fastapi import APIRouter, Depends, HTTPException
 from app import dependencies as deps
 from app.models import LoginRequest, RefreshTokenRequest, RegisterRequest
 from app.security import create_guest_token, create_refresh_token, create_token, refresh_access_token
-from app.services import auth_service
+from app.services import auth_service, account
+from pydantic import BaseModel, Field, field_validator
+from typing import Literal
 
 router = APIRouter()
 
@@ -54,3 +56,26 @@ def guest() -> dict:
 @router.get("/api/auth/status")
 def status(identity: dict = Depends(deps.get_user_identity)) -> dict:
     return {"status": "success", "identity": identity}
+
+
+class AccountUpdate(BaseModel):
+    username: str = Field(min_length=1, max_length=24)
+    avatar: Literal["fox", "cat", "panda", "rabbit", "koala", "penguin"]
+
+    @field_validator("username")
+    @classmethod
+    def clean_username(cls, value):
+        value = value.strip()
+        if not value:
+            raise ValueError("用户名不能为空")
+        return value
+
+
+@router.get("/api/auth/me")
+def get_me():
+    return account.account()
+
+
+@router.put("/api/auth/me")
+def update_me(form: AccountUpdate):
+    return account.update(form.username, form.avatar)

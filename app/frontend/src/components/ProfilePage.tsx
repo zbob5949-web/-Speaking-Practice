@@ -1,10 +1,11 @@
 import { useEffect, useState } from "react";
-import { getFavorites, getSessionHistory } from "../api";
+import { getFavorites, getSessionHistory, removeFavorite } from "../api";
 import type { Profile, Scenario, SessionHistoryItem } from "../types";
+import { AccountCard } from "./AccountCard";
 import { SecondaryButton } from "./ui";
 
 type Props = {
-  profile: Profile;
+  profile: Profile | null;
   onSelectScenario: (scenario: Scenario) => void;
   onNavigate?: (view: "growth" | "settings") => void;
 };
@@ -39,14 +40,14 @@ export function ProfilePage({ profile, onSelectScenario, onNavigate }: Props) {
 
   useEffect(() => {
     let cancelled = false;
-    getFavorites(profile.id)
+    getFavorites(profile?.id)
       .then((result) => {
         if (!cancelled) setFavorites(result.favorites);
       })
       .catch(() => {
         if (!cancelled) setFavorites([]);
       });
-    getSessionHistory(profile.id)
+    (profile ? getSessionHistory(profile.id) : Promise.resolve({ sessions: [] }))
       .then((result) => {
         if (!cancelled) setHistory(result.sessions);
       })
@@ -56,7 +57,7 @@ export function ProfilePage({ profile, onSelectScenario, onNavigate }: Props) {
     return () => {
       cancelled = true;
     };
-  }, [profile.id]);
+  }, [profile?.id]);
 
   const visibleFavorites = favoritesExpanded ? favorites : favorites.slice(0, FAVORITES_PREVIEW);
   const visibleHistory = historyExpanded ? history : history.slice(0, HISTORY_PREVIEW);
@@ -84,9 +85,10 @@ export function ProfilePage({ profile, onSelectScenario, onNavigate }: Props) {
             学习偏好
           </button>
         </div>
-        <p className="m-profile-sub">{profile.learning_goal} · {profile.current_level}</p>
+        <p className="m-profile-sub">{profile?.learning_goal ?? "开始你的口语练习"} · {profile?.current_level ?? ""}</p>
       </header>
 
+      <AccountCard />
       {tab === "learn" ? (
         detail ? (
           <section className="profile-layout">
@@ -128,6 +130,10 @@ export function ProfilePage({ profile, onSelectScenario, onNavigate }: Props) {
                           <strong>{SCENARIO_ZH[scenario.id] ?? scenario.title}</strong>
                           <span>{scenario.category} · {scenario.difficulty?.level ?? "A2"}</span>
                         </div>
+                        <SecondaryButton type="button" onClick={async () => {
+                          try { await removeFavorite(scenario.id, profile?.id); setFavorites(items => items.filter(item => item.id !== scenario.id)); }
+                          catch { window.alert("取消收藏失败，请重试"); }
+                        }}>取消收藏</SecondaryButton>
                         <SecondaryButton type="button" onClick={() => onSelectScenario(scenario)}>
                           开始
                         </SecondaryButton>
@@ -173,11 +179,11 @@ export function ProfilePage({ profile, onSelectScenario, onNavigate }: Props) {
               <ul className="m-list">
                 <li className="m-row">
                   <span className="m-row-label">学习目标</span>
-                  <span className="m-row-value">{profile.learning_goal}</span>
+                  <span className="m-row-value">{profile?.learning_goal ?? "未设置"}</span>
                 </li>
                 <li className="m-row">
                   <span className="m-row-label">当前水平</span>
-                  <span className="m-row-value">{profile.current_level}</span>
+                  <span className="m-row-value">{profile?.current_level ?? "未设置"}</span>
                 </li>
               </ul>
             </section>

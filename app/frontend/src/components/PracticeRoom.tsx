@@ -1,9 +1,10 @@
 import { Fragment, useEffect, useRef, useState } from "react";
-import { clearSessionHistory, completeSession, deleteTurnPair, getSelectedVoice, getSessionHistory, getSessionTurns, playAudioFromUrl, sendUserTurnStream, startScenarioSession, startSession, playTTS, stopActiveAudio, transcribeAudio, translateText } from "../api";
+import { getAccount, clearSessionHistory, completeSession, deleteTurnPair, getSelectedVoice, getSessionHistory, getSessionTurns, playAudioFromUrl, sendUserTurnStream, startScenarioSession, startSession, playTTS, stopActiveAudio, transcribeAudio, translateText } from "../api";
 import type { ConversationTurn, ErrorReport, ErrorReportItem, InlineFeedback, LanguageSupportResult, PlanDay, PracticeBrief, PracticeSession, Scenario, SessionCompletion, SessionHistoryItem, TargetExpression, TodayStrategy } from "../types";
 import { PrimaryButton, SecondaryButton } from "./ui";
 import { VoiceRecorder } from "./VoiceRecorder";
 import type { VoiceRecorderHandle } from "./VoiceRecorder";
+import { VoiceWaveform } from "./VoiceWaveform";
 import { ScenarioPicker } from "./ScenarioPicker";
 import { useIsMobile } from "../useIsMobile";
 
@@ -387,7 +388,21 @@ export function PracticeRoom({ day, scenario, todayStrategy, profileId, learning
       }, 400);
     }
   };
+  const [userAvatar, setUserAvatar] = useState(USER_AVATAR);
+  useEffect(() => {
+    let cancelled = false;
+    getAccount().then(account => { if (!cancelled) setUserAvatar(account.avatars[account.avatar] ?? USER_AVATAR); }).catch(() => {});
+    return () => { cancelled = true; };
+  }, []);
+  const typedFromVoiceRef = useRef(false);
+  const [knowledgeOpen, setKnowledgeOpen] = useState(false);
+  const [translationChoices, setTranslationChoices] = useState<Record<number, boolean>>({});
   const [translations, setTranslations] = useState<Record<number, string>>({});
+  const [translationLoading, setTranslationLoading] = useState<Record<number, boolean>>({});
+  const [translationErrors, setTranslationErrors] = useState<Record<number, string>>({});
+  const translationPending = useRef(new Set<number>());
+  const translationGeneration = useRef(0);
+  const restoredSession = useRef<number | null>(null);
   const [voiceTurnIds, setVoiceTurnIds] = useState<Set<number>>(new Set());
   const [voiceMeta, setVoiceMeta] = useState<Map<number, { durationMs: number }>>(new Map());
   const [voiceFailedIds, setVoiceFailedIds] = useState<Set<number>>(new Set());
@@ -534,14 +549,23 @@ export function PracticeRoom({ day, scenario, todayStrategy, profileId, learning
   }, [ttsMuted]);
 
   useEffect(() => {
+    let cancelled = false;
+    restoredSession.current = null;
+    translationGeneration.current++;
+    translationPending.current.clear();
     async function boot() {
       try {
         setApiError("");
         const result = scenario
           ? await startScenarioSession(scenario.id, profileId)
           : await startSession(day!.id);
+        if (cancelled) return;
+        let cached: { translations?: Record<number, string>; choices?: Record<number, boolean>; voiceTurns?: number[] } = {};
+        try { cached = JSON.parse(sessionStorage.getItem(`speakmate-chat:${result.session.id}`) ?? "{}"); } catch { /* Use server data if storage is unavailable. */ }
+        restoredSession.current = result.session.id;
         setSession(result.session);
-        setTurns(result.turns);
+        const voiceIds = new Set(cached.voiceTurns ?? []);
+        setTurns(result.turns.map(turn => voiceIds.has(turn.id) ? { ...turn, input_mode: "voice" as const } : turn));
         const feedbackHistory = result.feedback_history || [];
         setFeedbackTimeline(feedbackTimelineItems(feedbackHistory));
         setRoundErrorReports([]);
@@ -550,7 +574,11 @@ export function PracticeRoom({ day, scenario, todayStrategy, profileId, learning
         const hasUserTurns = result.turns.some((turn) => turn.speaker === "user");
         // 默认直接进入 AI 对话界面；「开口前提示」改为按需打开（顶部/输入卡的提示入口）
         setLessonPhase("practice");
-        setTranslations({});
+        setTranslations(cached.translations ?? {});
+        setTranslationChoices(cached.choices ?? {});
+        setTranslationLoading({});
+        setTranslationErrors({});
+        typedFromVoiceRef.current = false;
         setVoiceTurnIds(new Set());
         setVoiceMeta(new Map());
         setVoiceFailedIds(new Set());
@@ -564,40 +592,64 @@ export function PracticeRoom({ day, scenario, todayStrategy, profileId, learning
       }
     }
     void boot();
+    return () => { cancelled = true; translationGeneration.current++; };
   }, [scenario?.id, day?.id, sessionEpoch]);
 
-  // 双语展示：按需为消息生成中文翻译（缓存；电话模式下双方消息都翻译）
+  // Cache display state per session so returning through Home does not discard it.
   useEffect(() => {
-    if (!bilingualEnabled) return;
-    const pending = turns.filter(
-      (turn) => !(turn.id in translations)
-    );
-    if (pending.length === 0) return;
-    let cancelled = false;
-    void (async () => {
-      const next: Record<number, string> = {};
-      for (const turn of pending.slice(0, 5)) {
-        try {
-          const result = await translateText(turn.text.slice(0, 1200));
-          if (!cancelled && result.translation_zh) {
-            next[turn.id] = result.translation_zh;
-          }
-        } catch {
-          // 翻译失败静默，双语开关仍可用
-        }
+    if (!session || restoredSession.current !== session.id) return;
+    try {
+      sessionStorage.setItem(`speakmate-chat:${session.id}`, JSON.stringify({
+        translations, choices: translationChoices,
+        voiceTurns: turns.filter(turn => turn.input_mode === "voice" || voiceTurnIds.has(turn.id)).map(turn => turn.id),
+      }));
+    } catch { /* A full or unavailable cache must not interrupt chat. */ }
+  }, [session, turns, translations, translationChoices, voiceTurnIds]);
+
+  async function requestTranslation(turn: ConversationTurn) {
+    if (turn.speaker !== "assistant" || translations[turn.id] || translationPending.current.has(turn.id)) return;
+    const generation = translationGeneration.current;
+    translationPending.current.add(turn.id);
+    setTranslationLoading(current => ({ ...current, [turn.id]: true }));
+    setTranslationErrors(current => ({ ...current, [turn.id]: "" }));
+    try {
+      const result = await translateText(turn.text.slice(0, 2000));
+      if (!result.translation_zh?.trim()) throw new Error("翻译暂不可用");
+      if (generation === translationGeneration.current) setTranslations(current => ({ ...current, [turn.id]: result.translation_zh }));
+    } catch {
+      if (generation === translationGeneration.current) setTranslationErrors(current => ({ ...current, [turn.id]: "翻译失败，请重试" }));
+    } finally {
+      if (generation === translationGeneration.current) {
+        translationPending.current.delete(turn.id);
+        setTranslationLoading(current => ({ ...current, [turn.id]: false }));
       }
-      if (!cancelled && Object.keys(next).length > 0) {
-        setTranslations((current) => ({ ...current, ...next }));
+    }
+  }
+
+  useEffect(() => {
+    for (const turn of turns) {
+      if (turn.speaker === "assistant" && !translationErrors[turn.id] &&
+          (translationChoices[turn.id] ?? (turn.input_mode !== "voice" && bilingualEnabled))) {
+        void requestTranslation(turn);
       }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [turns, bilingualEnabled, translations]);
+    }
+  }, [turns, bilingualEnabled, translations, translationChoices, translationErrors]);
+
+  function toggleTranslation(turn: ConversationTurn, shown: boolean) {
+    if (translationErrors[turn.id]) {
+      setTranslationChoices(current => ({ ...current, [turn.id]: true }));
+      void requestTranslation(turn);
+    } else {
+      setTranslationChoices(current => ({ ...current, [turn.id]: !shown }));
+      if (!shown) void requestTranslation(turn);
+    }
+  }
 
   async function submitTurn(text: string, voiceTempId?: number) {
     if (!session || !text.trim() || isSubmittingRef.current) return;
 
+    const wasVoice = Boolean(voiceTempId) || typedFromVoiceRef.current;
+    typedFromVoiceRef.current = false;
     isSubmittingRef.current = true;
     setIsSubmitting(true);
     setApiError("");
@@ -643,7 +695,8 @@ export function PracticeRoom({ day, scenario, todayStrategy, profileId, learning
               queueAudioText(cleanSentence);
             }
           }
-        }
+        },
+        wasVoice ? "voice" : "text"
       );
 
       // End of stream, flush remaining text
@@ -670,6 +723,7 @@ export function PracticeRoom({ day, scenario, todayStrategy, profileId, learning
           session_id: session.id,
           turn_index: tempUserTurn.turn_index + 1,
           speaker: "assistant",
+          input_mode: wasVoice ? "voice" : "text",
           text: fullStreamedText.trim()
         };
         return [...withoutTemp, tempUserTurn, fallbackAssistantTurn];
@@ -677,6 +731,7 @@ export function PracticeRoom({ day, scenario, todayStrategy, profileId, learning
 
       // 标记正在朗读的 AI 文字条：TTS 队列/缓冲仍有内容时显示波峰谷跳动样式
       const assistantId = result.assistant_turn ? result.assistant_turn.id : fallbackAssistantId;
+      if (wasVoice) setTurns(current => current.map(turn => turn.id === assistantId || turn.id === (result.user_turn?.id ?? tempUserTurn.id) ? { ...turn, input_mode: "voice" } : turn));
       if ((isPlayingAudioRef.current || audioQueueRef.current.length > 0 || audioBufferRef.current) && !ttsMutedRef.current) {
         setTtsSpeakingTurnId(assistantId);
       }
@@ -743,6 +798,7 @@ export function PracticeRoom({ day, scenario, todayStrategy, profileId, learning
             session_id: session.id,
             turn_index: tempUserTurn.turn_index + 1,
             speaker: "assistant",
+            input_mode: wasVoice ? "voice" : "text",
             text: fullStreamedText.trim()
           };
           return [...withoutTemp, tempUserTurn, fallbackAssistantTurn];
@@ -793,11 +849,21 @@ export function PracticeRoom({ day, scenario, todayStrategy, profileId, learning
   async function playVoiceTurn(turnId: number) {
     const url = voiceAudioUrls.get(turnId);
     if (!url) return;
+    setTtsSpeakingTurnId(turnId);
     try {
       await playAudioFromUrl(url);
     } catch {
-      // 播放失败静默
+      setApiError("语音播放失败，请重试。");
+    } finally {
+      setTtsSpeakingTurnId(current => current === turnId ? null : current);
     }
+  }
+
+  async function replayVoice(text: string, turnId: number) {
+    stopActiveAudio(); setTtsSpeakingTurnId(turnId);
+    try { await playTTS(text, getSelectedVoice() ?? undefined); }
+    catch { setApiError("语音播放失败，请重试。"); }
+    finally { setTtsSpeakingTurnId(current => current === turnId ? null : current); }
   }
 
   async function handleReplay(text: string, turnId?: number) {
@@ -1177,6 +1243,7 @@ export function PracticeRoom({ day, scenario, todayStrategy, profileId, learning
               <p className="topic-strip-context">{scenario?.background ?? day?.scenario}</p>
             </div>
             <div className="topic-strip-actions">
+              {scenario?.id === "free_talk" ? <button type="button" className="bilingual-toggle" aria-expanded={knowledgeOpen} onClick={() => setKnowledgeOpen(value => !value)}>知识库</button> : null}
               <button
                 className={bilingualEnabled ? "bilingual-toggle bilingual-toggle-active" : "bilingual-toggle"}
                 type="button"
@@ -1251,6 +1318,7 @@ export function PracticeRoom({ day, scenario, todayStrategy, profileId, learning
             </div>
           ) : null}
 
+          {knowledgeOpen && scenario?.id === "free_talk" ? <aside className="knowledge-notice" role="status">知识库文件导入即将开放。<button type="button" className="voice-translation-toggle" onClick={() => setKnowledgeOpen(false)}>关闭</button></aside> : null}
           <section className="chat-card">
             <div className="chat-thread" aria-label="对话练习">
               <div className="chat-scroll" ref={chatScrollRef}>
@@ -1258,9 +1326,10 @@ export function PracticeRoom({ day, scenario, todayStrategy, profileId, learning
                   const isUser = turn.speaker === "user";
                   const nextTurn = turns.find((item) => item.turn_index === turn.turn_index + 1);
                   const canDeletePair = isUser && nextTurn?.speaker === "assistant";
-                  const translation = bilingualEnabled ? translations[turn.id] : undefined;
-                  const isVoice = isUser && voiceTurnIds.has(turn.id);
-                  const voiceDuration = voiceMeta.get(turn.id)?.durationMs ?? 0;
+                  const isVoice = turn.input_mode === "voice" || (isUser && voiceTurnIds.has(turn.id));
+                  const showTranslation = !isUser && (translationChoices[turn.id] ?? (!isVoice && bilingualEnabled));
+                  const translation = showTranslation ? translations[turn.id] : undefined;
+                  const voiceDuration = voiceMeta.get(turn.id)?.durationMs ?? Math.max(1000, turn.text.split(/\s+/).length * 400);
                   const voiceFailed = voiceFailedIds.has(turn.id);
                   // 该消息对应的纠错（仅 correction 视为「存在错误」）
                   const turnFeedbackItems = isUser
@@ -1300,17 +1369,15 @@ export function PracticeRoom({ day, scenario, todayStrategy, profileId, learning
                             role="button"
                             tabIndex={0}
                             aria-label="点击播放语音"
-                            onClick={() => void playVoiceTurn(turn.id)}
+                            onClick={() => void (isUser && voiceAudioUrls.has(turn.id) ? playVoiceTurn(turn.id) : replayVoice(turn.text, turn.id))}
                             onKeyDown={(event) => {
                               if (event.key === "Enter" || event.key === " ") {
                                 event.preventDefault();
-                                void playVoiceTurn(turn.id);
+                                void (isUser && voiceAudioUrls.has(turn.id) ? playVoiceTurn(turn.id) : replayVoice(turn.text, turn.id));
                               }
                             }}
                           >
-                            <span className="voice-bubble-bars" aria-hidden="true">
-                              <i /><i /><i /><i />
-                            </span>
+                            <VoiceWaveform active={turn.id === ttsSpeakingTurnId} />
                             <span className="voice-bubble-duration">{Math.round(voiceDuration / 1000)}″</span>
                             {voiceFailed ? <span className="voice-bubble-failed">未识别</span> : null}
                           </span>
@@ -1324,9 +1391,13 @@ export function PracticeRoom({ day, scenario, todayStrategy, profileId, learning
                             ) : null}
                           </>
                         )}
-                        {isVoice && !voiceFailed && voiceTexts.get(turn.id) ? (
-                          <p className="voice-bubble-text">{voiceTexts.get(turn.id)}</p>
+                        {isVoice && !voiceFailed ? (
+                          <>
+                            <p className="voice-bubble-text">{voiceTexts.get(turn.id) ?? turn.text}</p>
+                            {!isUser ? <button type="button" className="voice-translation-toggle" aria-pressed={showTranslation} disabled={translationLoading[turn.id]} onClick={() => toggleTranslation(turn, showTranslation)}>{translationLoading[turn.id] ? "翻译中…" : translationErrors[turn.id] ? "重试翻译" : showTranslation ? "收起中文" : "翻译中文"}</button> : null}
+                          </>
                         ) : null}
+                        {!isUser && translationErrors[turn.id] ? <p className="translation-error" role="status">{translationErrors[turn.id]}</p> : null}
                         {translation ? <p className={"message-translation" + (isUser ? " message-translation-user" : "")}>{translation}</p> : null}
                         {isUser && turnFeedbackItems.length > 0 ? (
                           <button
@@ -1354,7 +1425,7 @@ export function PracticeRoom({ day, scenario, todayStrategy, profileId, learning
                       ) : null}
                       {isUser ? (
                         <div className="message-avatar message-avatar-user" aria-hidden="true">
-                          {USER_AVATAR}
+                          {userAvatar}
                         </div>
                       ) : null}
                       {isUser && openFeedbackTurnId === turn.id && turnFeedbackItems.length > 0 ? (
@@ -1457,7 +1528,7 @@ export function PracticeRoom({ day, scenario, todayStrategy, profileId, learning
                 placeholder={isMobile ? "说一句英文，或长按这里说话" : "可以录音转文字，也可以直接输入英文。确认后点击发送。"}
                 {...({ enterKeyHint: "send", autoCapitalize: "off", autoCorrect: "off" } as Record<string, string>)}
                 value={typedText}
-                onChange={(event) => setTypedText(event.target.value)}
+                onChange={(event) => { typedFromVoiceRef.current = false; setTypedText(event.target.value); }}
                 onKeyDown={(event) => {
                   if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) {
                     event.preventDefault();
@@ -1470,6 +1541,7 @@ export function PracticeRoom({ day, scenario, todayStrategy, profileId, learning
               {isMobile ? (
                 <div className="m-composer-actions">
                   <div className="m-chips">
+                    {scenario?.id === "free_talk" ? <button type="button" className="m-chip" aria-expanded={knowledgeOpen} onClick={() => setKnowledgeOpen(value => !value)}>知识库</button> : null}
                     <button
                       type="button"
                       className={bilingualEnabled ? "m-chip m-chip-on" : "m-chip"}
@@ -1510,6 +1582,7 @@ export function PracticeRoom({ day, scenario, todayStrategy, profileId, learning
                       autoMode={phoneMode}
                       autoRecordSignal={autoRecordSignal}
                       onText={(text) => {
+                        typedFromVoiceRef.current = true;
                         if (phoneModeRef.current) {
                           // 电话模式：识别即自动发送，无需手动点发送
                           void submitTurn(text);
@@ -1528,6 +1601,7 @@ export function PracticeRoom({ day, scenario, todayStrategy, profileId, learning
                     autoMode={phoneMode}
                     autoRecordSignal={autoRecordSignal}
                     onText={(text) => {
+                      typedFromVoiceRef.current = true;
                       if (phoneModeRef.current) {
                         // 电话模式：识别即自动发送，无需手动点发送
                         void submitTurn(text);

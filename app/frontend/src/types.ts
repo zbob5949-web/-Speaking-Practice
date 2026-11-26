@@ -21,6 +21,7 @@ export type OnboardingResponse = {
 };
 
 export type ConversationTurn = {
+  input_mode?: "text" | "voice";
   id: number;
   session_id: number;
   turn_index: number;

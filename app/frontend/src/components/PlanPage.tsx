@@ -60,6 +60,8 @@ export function PlanPage({ profileId, activeScenarioId, onStartScenario, onStart
   const [pathLoading, setPathLoading] = useState(false);
   // 「没有明确想法？」默认收起，点开才出现详细内容
   const [pathOpen, setPathOpen] = useState(false);
+  const [favoriteError, setFavoriteError] = useState("");
+  const [favoriteBusy, setFavoriteBusy] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -118,7 +120,8 @@ export function PlanPage({ profileId, activeScenarioId, onStartScenario, onStart
   }
 
   async function toggleFavorite(scenario: Scenario) {
-    if (!profileId) return;
+    if (favoriteBusy) return;
+    setFavoriteBusy(scenario.id); setFavoriteError("");
     try {
       if (scenario.is_favorite) {
         await removeFavorite(scenario.id, profileId);
@@ -136,8 +139,8 @@ export function PlanPage({ profileId, activeScenarioId, onStartScenario, onStart
           : current
       );
     } catch {
-      // 收藏失败保持原状
-    }
+      setFavoriteError("收藏操作失败，请重试");
+    } finally { setFavoriteBusy(null); }
   }
 
   function startRandom() {
@@ -154,11 +157,21 @@ export function PlanPage({ profileId, activeScenarioId, onStartScenario, onStart
       <PageHeader
         eyebrow="场景库"
         title="选择练习场景"
-        description="涵盖出行、餐饮、职场、医疗与购物等真实生活场景，难度随你的水平自适应。"
         action={
-          <PrimaryButton type="button" onClick={startRandom} disabled={filtered.length === 0}>
-            随机一个场景
-          </PrimaryButton>
+          <div className="plan-actions">
+            <button
+              type="button"
+              className="route-toggle"
+              aria-expanded={pathOpen}
+              onClick={() => setPathOpen((value) => !value)}
+            >
+              选择学习路线
+              <span className="route-caret" aria-hidden="true">{pathOpen ? "▲" : "▼"}</span>
+            </button>
+            <PrimaryButton type="button" onClick={startRandom} disabled={filtered.length === 0}>
+              随机一个场景
+            </PrimaryButton>
+          </div>
         }
       />
 
@@ -197,74 +210,49 @@ export function PlanPage({ profileId, activeScenarioId, onStartScenario, onStart
             </label>
           </section>
 
-          <section className="learning-path-block" aria-label="学习路线">
-            <button
-              type="button"
-              className="learning-path-header learning-path-toggle"
-              aria-expanded={pathOpen}
-              onClick={() => setPathOpen((value) => !value)}
-            >
-              <div>
-                <p className="section-label">没有明确想法？</p>
-                <h2>按水平生成学习路线</h2>
-              </div>
-              <span className="learning-path-chevron" aria-hidden="true">{pathOpen ? "收起" : "展开"}</span>
-            </button>
-            {pathOpen ? (
-              <>
-                <p className="muted learning-path-intro">选择你的水平，为你排好由易到难的练习顺序。</p>
-                <div className="learning-path-tiers">
-                  {catalog.tiers.map((item) => (
-                    <button
-                      className={learningPath?.tier === item.id ? "path-tier path-tier-active" : "path-tier"}
-                      key={item.id}
-                      type="button"
-                      disabled={pathLoading}
-                      onClick={() => void generatePath(item.id)}
-                    >
-                      {item.label}
-                      <small>{item.levels.join(" / ")}</small>
-                    </button>
-                  ))}
-                </div>
-              </>
-            ) : null}
-            {pathOpen && learningPath ? (
-              <div className="learning-path-cards">
-                {learningPath.path.map((scenario, index) => (
+          {pathOpen ? (
+            <section className="learning-path-block" aria-label="选择学习路线">
+              <div className="learning-path-tiers">
+                {catalog.tiers.map((item) => (
                   <button
-                    className="path-card"
-                    key={scenario.id}
+                    className={learningPath?.tier === item.id ? "path-tier path-tier-active" : "path-tier"}
+                    key={item.id}
                     type="button"
-                    onClick={() => {
-                      if (onStartPath) {
-                        onStartPath(scenario);
-                      } else {
-                        onStartScenario(scenario);
-                      }
-                    }}
+                    disabled={pathLoading}
+                    onClick={() => void generatePath(item.id)}
                   >
-                    <span className="path-card-index">{index + 1}</span>
-                    <span
-                      className="scenario-card-media"
-                      aria-hidden="true"
-                      style={{
-                        backgroundImage: SCENARIO_IMAGES[scenario.id]
-                          ? `url("${SCENARIO_IMAGES[scenario.id]}")`
-                          : CATEGORY_TINTS[scenario.category] ?? undefined,
-                      }}
-                    />
-                    <span className="scenario-level">{scenario.difficulty?.level ?? ""}</span>
-                    <strong>{scenario.title}</strong>
-                    <small>{scenario.category} · {scenario.npc_role}</small>
+                    {item.label}
                   </button>
                 ))}
               </div>
-            ) : null}
-          </section>
+              {learningPath ? (
+                <div className="learning-path-cards">
+                  {learningPath.path.map((scenario, index) => (
+                    <button
+                      className="path-card"
+                      key={scenario.id}
+                      type="button"
+                      onClick={() => {
+                        if (onStartPath) {
+                          onStartPath(scenario);
+                        } else {
+                          onStartScenario(scenario);
+                        }
+                      }}
+                    >
+                      <span className="path-card-index">{index + 1}</span>
+                      <strong>{scenario.title}</strong>
+                    </button>
+                  ))}
+                </div>
+              ) : null}
+            </section>
+          ) : null}
 
+          {favoriteError ? <p role="alert">{favoriteError}</p> : null}
           <div className="scenario-grid">
             {filtered.map((scenario) => (
+              <div className="scenario-tile-wrap" key={scenario.id}>
               <button
                 className={scenario.id === activeScenarioId ? "scenario-tile scenario-tile-active" : "scenario-tile"}
                 key={scenario.id}
@@ -275,21 +263,18 @@ export function PlanPage({ profileId, activeScenarioId, onStartScenario, onStart
                 <div className="scenario-tile-body">
                   <div className="scenario-tile-meta">
                     <span className="scenario-level">{scenario.difficulty?.level ?? "A2"}</span>
-                    <span className="scenario-tile-role">{scenario.category}</span>
                   </div>
                   <strong>{SCENARIO_ZH[scenario.id] ?? scenario.title}</strong>
                   <p className="scenario-tile-intro">{SCENARIO_INTRO_ZH[scenario.id] ?? ""}</p>
                 </div>
               </button>
+              <button type="button" className="scenario-favorite" disabled={favoriteBusy === scenario.id} aria-label={`${scenario.is_favorite ? "取消收藏" : "收藏"}${SCENARIO_ZH[scenario.id] ?? scenario.title}`} aria-pressed={!!scenario.is_favorite} onClick={() => void toggleFavorite(scenario)}>{scenario.is_favorite ? "★" : "☆"}</button>
+              </div>
             ))}
             {filtered.length === 0 ? (
               <p className="muted scenario-empty">没有符合筛选条件的场景，试试放宽条件。</p>
             ) : null}
           </div>
-          <p className="muted scenario-grid-note">
-            {activeTier ? `当前按「${activeTier.label}」难度过滤。` : ""}
-            完成后系统会生成纠错报告与当日复盘，成长板块随之更新。
-          </p>
         </>
       ) : null}
     </main>

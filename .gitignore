@@ -5,6 +5,7 @@ __pycache__/
 *.egg-info/
 node_modules/
 dist/
+app/admin-dist/
 data/*.sqlite
 data/*.db
 data/*.sqlite-shm
@@ -20,3 +21,14 @@ data/*.sqlite-wal
 
 # ASR 模型（用下载脚本重新获取，约450MB）
 data/asr_model/
+
+# 打包产物与临时文件（曾误把含 .env 的 tar.gz 提交入库，永久禁止）
+*.tar.gz
+*.zip
+*.log
+tmp/
+p5_*.png
+speakmate-handoff-*
+# 与 app/backend/tests 完全重复的交付副本，不入库
+测试用例 + 测试结果/
+

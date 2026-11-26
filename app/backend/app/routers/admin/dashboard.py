@@ -45,7 +45,7 @@ def dashboard_overview(_: dict = Depends(get_current_admin_user)) -> dict:
         total_feedback = _scalar(conn, "SELECT COUNT(*) FROM inline_feedback")
         error_items = _scalar(conn, "SELECT COUNT(*) FROM error_bank")
         expression_items = _scalar(conn, "SELECT COUNT(*) FROM expression_bank")
-        favorites = _scalar(conn, "SELECT COUNT(*) FROM favorites")
+        favorites = _scalar(conn, "SELECT COUNT(*) FROM account_favorites")
 
         hot_scenarios = conn.execute(
             "SELECT scenario_id, COUNT(*) AS cnt "

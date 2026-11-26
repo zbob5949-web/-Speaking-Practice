@@ -34,6 +34,7 @@ def add_user_turn_stream(request: UserTurnRequest) -> StreamingResponse:
     return StreamingResponse(
         sessions_service.stream_user_turn(request),
         media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache, no-transform", "X-Accel-Buffering": "no"},
     )
 
 

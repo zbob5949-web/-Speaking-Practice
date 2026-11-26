@@ -25,7 +25,7 @@ from app.security import hash_password
 
 router = APIRouter(tags=["管理-用户"])
 
-_USER_FIELDS = "id, phone, role, is_active, is_super_admin, last_login_ip, last_login, created_at"
+_USER_FIELDS = "id, phone, username, avatar, role, is_active, is_super_admin, last_login_ip, last_login, created_at"
 
 
 def _user_row(row) -> dict:
@@ -50,7 +50,7 @@ def admin_list_users(
     conditions: list[str] = []
     params: list[object] = []
 
-    build_filters(conditions, params, keyword, ["phone"])
+    build_filters(conditions, params, keyword, ["phone", "username"])
     if role:
         conditions.append("role = ?")
         params.append(role)

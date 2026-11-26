@@ -3,6 +3,7 @@ import { UNAUTHORIZED_EVENT, clearAuth, getCurrentLearningState, getTodayStrateg
 import { AppShell } from "./components/AppShell";
 import { DevicePreview } from "./components/DevicePreview";
 import { GrowthPage } from "./components/GrowthPage";
+import type { GrowthDetail } from "./components/GrowthPage";
 import { HomePage } from "./components/HomePage";
 import { LoginPage } from "./components/LoginPage";
 import { PlanPage } from "./components/PlanPage";
@@ -61,6 +62,8 @@ function AppInner() {
   const [activeScenario, setActiveScenario] = useState<Scenario | null>(null);
   const [learningPath, setLearningPath] = useState<Scenario[] | null>(null);
   const [todayStrategy, setTodayStrategy] = useState<TodayStrategy | null>(null);
+  // 成长页的详情子页：null 表示显示入口列表
+  const [growthDetail, setGrowthDetail] = useState<GrowthDetail>(null);
   // 返回栈：用于全局「返回上一页」
   const viewStackRef = useRef<View[]>([]);
   const [canBack, setCanBack] = useState(false);
@@ -110,12 +113,16 @@ function AppInner() {
     stopActiveAudio();
     clearAuth();
     setAuthed(false);
+    setLearningPath(null);
+    viewStackRef.current = [];
+    setCanBack(false);
+    localStorage.removeItem(LAST_SCENARIO_KEY);
+    localStorage.removeItem(LAST_PATH_KEY);
     setProfile(null);
     setPlan([]);
     setActiveDay(null);
     setActiveScenario(null);
     setTodayStrategy(null);
-    // 保留 last-scenario / last-path：重新登入同一账号后恢复上次对话界面
     setView("auth");
   }
 
@@ -166,6 +173,10 @@ function AppInner() {
   const navigate = (nextView: AppView) => {
     // 切换界面时中断正在播放的音频（TTS / 语音条）
     stopActiveAudio();
+    // 离开成长页时收起详情子页，下次进入回到入口列表
+    if (nextView !== "growth") {
+      setGrowthDetail(null);
+    }
     // 记录返回栈（同一页面不重复入栈）
     if (view !== nextView) {
       viewStackRef.current = [...viewStackRef.current, view as View].slice(-10);
@@ -180,6 +191,7 @@ function AppInner() {
     stopActiveAudio();
     viewStackRef.current = [];
     setCanBack(false);
+    setGrowthDetail(null);
     setView("home");
     localStorage.setItem("speakmate-last-view", "home");
   };
@@ -205,6 +217,7 @@ function AppInner() {
         profileId={profile?.id}
         onStart={() => navigate("today")}
         onReview={() => navigate("growth")}
+        onSettings={() => navigate("settings")}
       />
     );
   } else if (view === "today" || view === "practice") {
@@ -232,19 +245,23 @@ function AppInner() {
       />
     );
   } else if (view === "growth") {
-    content = <GrowthPage profileId={profile?.id} />;
+    content = (
+      <GrowthPage
+        profileId={profile?.id}
+        detail={growthDetail}
+        onDetailChange={setGrowthDetail}
+      />
+    );
   } else if (view === "me") {
-    content = profile ? (
+    content = (
       <ProfilePage
         profile={profile}
         onSelectScenario={selectScenario}
         onNavigate={(next) => navigate(next as AppView)}
       />
-    ) : (
-      <PlanPage profileId={undefined} activeScenarioId={null} onStartScenario={selectScenario} onStartPath={startPathScenario} onLearningPathGenerated={handleLearningPathGenerated} />
     );
   } else if (view === "settings") {
-    content = <SettingsPage />;
+    content = <SettingsPage onLogout={handleLogout} />;
   } else if (today) {
     content = (
       <PracticeRoom
