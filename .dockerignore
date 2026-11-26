@@ -1,0 +1,11 @@
+.git
+.gitignore
+tmp
+node_modules
+.venv
+*.zip
+*.tar.gz
+*.log
+.env
+测试用例 + 测试结果
+docs
